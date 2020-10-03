@@ -1,5 +1,5 @@
 #include "src/include/pfm.h"
-
+#include <string>
 namespace PeterDB {
     PagedFileManager &PagedFileManager::instance() {
         static PagedFileManager _pf_manager = PagedFileManager();
