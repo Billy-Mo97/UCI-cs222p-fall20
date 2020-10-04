@@ -35,7 +35,7 @@ namespace PeterDB {
         unsigned readPageCounter;
         unsigned writePageCounter;
         unsigned appendPageCounter;
-
+        unsigned numOfPages;
         FileHandle();                                                       // Default constructor
         ~FileHandle();                                                      // Destructor
 
@@ -45,6 +45,12 @@ namespace PeterDB {
         unsigned getNumberOfPages();                                        // Get the number of pages in the file
         RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount,
                                 unsigned &appendPageCount);                 // Put current counter values into variables
+        RC initPointer(const std::string &fileName);
+
+        RC closePointer();
+
+    private:
+        FILE* pointer;
     };
 
 } // namespace PeterDB
