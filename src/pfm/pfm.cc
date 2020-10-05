@@ -38,6 +38,10 @@ namespace PeterDB {
                 fwrite(&writeNum, sizeof(unsigned), 1, file);
                 fwrite(&appendNum, sizeof(unsigned), 1, file);
                 fwrite(&pageNum, sizeof(unsigned), 1, file);
+                //Write end mark into the hidden page.
+                unsigned end = 0;
+                fseek(file, PAGE_SIZE - sizeof(unsigned), SEEK_SET);
+                fwrite(&end, sizeof(unsigned), 1, file);
                 fclose(file);
                 return 0;
             }
@@ -84,10 +88,12 @@ namespace PeterDB {
     //This principle applies to all FileHandle methods.
 
     RC FileHandle::readPage(PageNum pageNum, void *data) {
-        if (pageNum < 0 || pageNum > numOfPages) { return -1; }
+        if (pageNum < 0 || pageNum > numOfPages) {
+            return -1; }
         fseek(pointer, (pageNum + 1) * PAGE_SIZE, SEEK_SET);
         int result = fread(data, 1, PAGE_SIZE, pointer);
-        if (result != PAGE_SIZE) { return -1; }
+        if (result != PAGE_SIZE) {
+            return -1; }
         else {
             readPageCounter++;
             return 0;
@@ -131,7 +137,7 @@ namespace PeterDB {
         //Initiate the file pointer of FileHandle instance.
         if (pointer != NULL) { return -1; }
         else {
-            pointer = fopen(fileName.c_str(), "w+b");
+            pointer = fopen(fileName.c_str(), "r+b");
             if (pointer == NULL) { return -1; }
             else {
                 //Read the readPageCounter, writePageCounter, appendPageCounter and page number
