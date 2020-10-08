@@ -186,7 +186,6 @@ namespace PeterDB {
             }
         }
         //out << std::endl;
-        out.flush();
         free(nullIndicator);
         return 0;
     }
