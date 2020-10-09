@@ -141,16 +141,16 @@ namespace PeterDB {
         PagedFileManager* pagedFileManager;
 
 
-        void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, int &length, char *&info, int &size);
+        void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, char *&record, int &size);
 
         int getSlotTable(char *&page, int &slotCount, int &slotSize);
 
         RC
-        insertRecordInNewPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const void *data,
-                              RID &rid, int &recordLength, char *&recordInfo, int &dataSize);
+        insertRecordInNewPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
+                              RID &rid, char *&record, int &recordSize);
 
         RC insertRecordInOldPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, int pageNum,
-                                 const void *data, RID &rid, int &recordLength, char *&recordInfo, int &dataSize);
+                                 RID &rid, char *&record, int &recordSize);
     };
 
 } // namespace PeterDB

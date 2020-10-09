@@ -1,5 +1,6 @@
 #include "src/include/rbfm.h"
 #include "iostream"
+
 namespace PeterDB {
     RecordBasedFileManager &RecordBasedFileManager::instance() {
         static RecordBasedFileManager _rbf_manager = RecordBasedFileManager();
@@ -36,55 +37,59 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                             const void *data, RID &rid) {
-        //change format of record
-        int recordLength,dataSize;
-        char* recordInfo;
-        getFieldInfo(recordDescriptor,data,recordLength,recordInfo,dataSize);
+        //Change format of record
+        int recordSize;
+        char *record;
+        getFieldInfo(recordDescriptor, data,record, recordSize);
         int numOfPages = fileHandle.getNumberOfPages();
-        if(numOfPages > 0){
-            //insert into current page
-            RC status = insertRecordInOldPage(fileHandle, recordDescriptor, numOfPages - 1, data, rid,recordLength, recordInfo, dataSize);
-            if(status == -1){
+        if (numOfPages > 0) {
+            //Insert into current page
+            RC status = insertRecordInOldPage(fileHandle, recordDescriptor, numOfPages - 1, rid,
+                                              record, recordSize);
+            if (status == -1) {
 #ifdef DEBUG
                 std::cerr << "Can not insert record in current page" << std::endl;
-#endif          //linearly scan pages to insert
-                for(int i = 0;i < numOfPages - 1; i++){
-                    status = insertRecordInOldPage(fileHandle, recordDescriptor, i, data, rid,recordLength, recordInfo, dataSize);
-                    if(status == -1) {
+#endif          //linearly scan pages with enough space to insert
+                for (int i = 0; i < numOfPages - 1; i++) {
+                    status = insertRecordInOldPage(fileHandle, recordDescriptor, i, rid, record,
+                                                   recordSize);
+                    if (status == -1) {
 #ifdef DEBUG
-                        std::cerr << "Can not insert record in page:"<< i << std::endl;
+                        std::cerr << "Can not insert record in page:" << i << std::endl;
 #endif
-                    }else{
-                        free(recordInfo);
+                    } else {
+                        free(record);
                         return 0;
                     }
                 }
-                //insert in new page
-                status = insertRecordInNewPage(fileHandle, recordDescriptor, data, rid, recordLength, recordInfo, dataSize);
-                if(status == -1){
+                //If there is no page with enough space, insert the record in new page.
+                status = insertRecordInNewPage(fileHandle, recordDescriptor, rid, record,
+                                               recordSize);
+                if (status == -1) {
 #ifdef DEBUG
-                    std::cerr << "Can not insert record in new page:"<< std::endl;
+                    std::cerr << "Can not insert record in new page:" << std::endl;
 #endif
-                    free(recordInfo);
+                    free(record);
                     return -1;
-                }else{
-                    free(recordInfo);
+                } else {
+                    free(record);
                     return 0;
                 }
-            }else{
-                free(recordInfo);
+            } else {
+                free(record);
                 return 0;
             }
-        }else{
-            RC status = insertRecordInNewPage(fileHandle, recordDescriptor, data, rid, recordLength, recordInfo, dataSize);
-            if(status == -1){
+        } else {
+            RC status = insertRecordInNewPage(fileHandle, recordDescriptor, rid, record,
+                                              recordSize);
+            if (status == -1) {
 #ifdef DEBUG
-                std::cerr << "Can not insert record in new page:"<< std::endl;
+                std::cerr << "Can not insert record in new page:" << std::endl;
 #endif
-                free(recordInfo);
+                free(record);
                 return -1;
-            }else{
-                free(recordInfo);
+            } else {
+                free(record);
                 return 0;
             }
         }
@@ -93,9 +98,9 @@ namespace PeterDB {
     RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                           const RID &rid, void *data) {
         int pageNum = rid.pageNum, slotNum = rid.slotNum;
-        char *page = (char*)malloc(PAGE_SIZE);
+        char *page = (char *) malloc(PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, page);
-        if (status == -1){
+        if (status == -1) {
 #ifdef DEBUG
             std::cerr << "Can not read page " << pageNum << " while read record" << std::endl;
 #endif
@@ -109,21 +114,21 @@ namespace PeterDB {
         int dataEnd = offset + dataLen;
         int nullBit = 0, dataOffset = 0;
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-        char *nullIndicator = (char*)malloc(nullIndicatorSize);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);
         //num of fields
         offset += sizeof(int);
-        memcpy(nullIndicator, (char *)page + offset, nullIndicatorSize);
-        memcpy(data, (char *)page + offset, nullIndicatorSize);
+        memcpy(nullIndicator, (char *) page + offset, nullIndicatorSize);
+        memcpy(data, (char *) page + offset, nullIndicatorSize);
         dataOffset += nullIndicatorSize;
         offset += nullIndicatorSize;
         //offsets of non null fields
-        int nonNull=0;
-        for (int i = 0; i < recordDescriptor.size(); i++){
+        int nonNull = 0;
+        for (int i = 0; i < recordDescriptor.size(); i++) {
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
-            if(nullBit == 0){nonNull++;}
+            if (nullBit == 0) { nonNull++; }
         }
         offset += nonNull * sizeof(int);
-        memcpy((char*)data + dataOffset, (char*)page + offset, dataEnd - offset);
+        memcpy((char *) data + dataOffset, (char *) page + offset, dataEnd - offset);
         free(page);
         free(nullIndicator);
         return 0;
@@ -136,47 +141,52 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::printRecord(const std::vector<Attribute> &recordDescriptor, const void *data,
                                            std::ostream &out) {
+        //Given data (null-fields-indicator + actual data) and record descriptor, print out the data.
+        //nullBit: null bit for current attribute.
+        //offset: pointer to iterate through the record.
+        //First, copy the null indicator from data into nullIndicator.
         int nullBit = 0, offset = 0;
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-        char *nullIndicator = (char*)malloc(nullIndicatorSize);
-        memcpy(nullIndicator, (char *)data + offset, nullIndicatorSize);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        memcpy(nullIndicator, (char *) data + offset, nullIndicatorSize);
         offset += nullIndicatorSize;
-        for (int i = 0; i < recordDescriptor.size(); i++){
+        //Then, follow recordDescriptor to iterate through the data.
+        //If the attribute is not null, print it out with certain type.
+        for (int i = 0; i < recordDescriptor.size(); i++) {
             out << recordDescriptor[i].name << ": ";
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
-            if (nullBit == 0){
+            if (nullBit == 0) {
                 AttrType type = recordDescriptor[i].type;
-                if (type == TypeInt){
+                if (type == TypeInt) {
                     int val;
-                    memcpy(&val, (char *)data + offset, sizeof(int));
-                    out << val ;
+                    memcpy(&val, (char *) data + offset, sizeof(int));
+                    out << val;
                     offset += sizeof(int);
-                }
-                else if (type == TypeReal){
+                } else if (type == TypeReal) {
                     float val;
-                    memcpy(&val, (char *)data + offset, sizeof(float));
+                    memcpy(&val, (char *) data + offset, sizeof(float));
                     out << val;
                     offset += sizeof(float);
-                }
-                else if (type == TypeVarChar){
+                } else if (type == TypeVarChar) {
                     int strLen;
-                    memcpy(&strLen, (char *)data + offset, sizeof(int));
+                    memcpy(&strLen, (char *) data + offset, sizeof(int));
                     offset += sizeof(int);
-                    char* str = (char*)malloc(strLen + 1);
+                    char *str = (char *) malloc(strLen + 1);
                     str[strLen] = '\0';
-                    memcpy(str, (char *)data + offset, strLen);
+                    memcpy(str, (char *) data + offset, strLen);
                     out << str;
                     offset += strLen;
                     free(str);
                 }
-            }else{
+            } else {
                 out << "NULL";
             }
-            if(i != recordDescriptor.size() - 1){
+            if (i != recordDescriptor.size() - 1) {
                 out << ", ";
             }
         }
         //out << std::endl;
+        out.flush();
         free(nullIndicator);
         return 0;
     }
@@ -198,82 +208,91 @@ namespace PeterDB {
         return -1;
     }
 
-    void RecordBasedFileManager::getFieldInfo(const std::vector<Attribute> &recordDescriptor, const void *data, int& recordLength,
-                                              char *&recordInfo, int& dataSize) {
+    void RecordBasedFileManager::getFieldInfo(const std::vector<Attribute> &recordDescriptor, const void *data,
+                                              char *&record, int &recordSize) {
+        //Do some pre-preparation the record to insert.
+        //The record consists of fieldsNum, null indicator, offsets of fields, and data of the record.
+        //This method is to prepare the record to inert into the page.
+        //Also, get the record size, assign it to recordSize.
+        //dataOffset: point to iterate through data.
+        //offset: pointer to iterate through record.
         int dataOffset = 0, offset = 0;
         int nullBit = 0;
+        int infoSize = 0;
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-        char *nullIndicator = (char*)malloc(nullIndicatorSize);
-        memcpy(nullIndicator, (char *)data + dataOffset, nullIndicatorSize);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        memcpy(nullIndicator, (char *) data + dataOffset, nullIndicatorSize);
         dataOffset += nullIndicatorSize;
         int fieldsNum = recordDescriptor.size();
         //get num of non null fields
-        int nonNull=0;
-        for (int i = 0; i < recordDescriptor.size(); i++){
+        int nonNull = 0;
+        for (int i = 0; i < recordDescriptor.size(); i++) {
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
-            if(nullBit == 0){nonNull++;}
+            if (nullBit == 0) {
+                nonNull++;
+                recordSize += recordDescriptor[i].length;
+            }
         }
-        //a record consists of fieldsNum, null indicator, offsets of fields
-        recordLength = sizeof(int) + nullIndicatorSize + nonNull * sizeof(int);
-        recordInfo = (char*)malloc(recordLength);
-        //assign fieldsNum
-        memcpy(recordInfo + offset, &fieldsNum, sizeof(int));
+        //Record first three parts consist of fieldsNum, null indicator, offsets of fields
+        //Allocate memory for record
+        infoSize = sizeof(int) + nullIndicatorSize + nonNull * sizeof(int);
+        record = (char *) malloc(infoSize);
+        //Assign fieldsNum
+        memcpy(record + offset, &fieldsNum, sizeof(int));
         offset += sizeof(int);
-        //assign null indicator
-        memcpy(recordInfo + offset, (char*)nullIndicator, sizeof(nullIndicatorSize));
+        //Assign null indicator
+        memcpy(record + offset, (char *) nullIndicator, sizeof(nullIndicatorSize));
         offset += sizeof(nullIndicatorSize);
-        //assign offsets
+        //Assign offsets and recordData.
+        //fieldOffset is set to the start of actual data in the record
         int fieldOffset = offset + nonNull * sizeof(int);
-        for (int i = 0; i < recordDescriptor.size(); i++){
+        for (int i = 0; i < recordDescriptor.size(); i++) {
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
-            if (nullBit == 0){
+            if (nullBit == 0) {
+                memcpy(record + offset, &fieldOffset, sizeof(int));
                 AttrType type = recordDescriptor[i].type;
-                if (type == TypeInt){
+                if (type == TypeInt) {
+                    memcpy(record + fieldOffset, (char *) data + dataOffset, sizeof(int));
                     fieldOffset += sizeof(int);
                     dataOffset += sizeof(int);
-                }
-                else if (type == TypeReal){
+                } else if (type == TypeReal) {
+                    memcpy(record + fieldOffset, (char *) data + dataOffset, sizeof(float));
                     fieldOffset += sizeof(float);
                     dataOffset += sizeof(float);
-                }
-                else if (type == TypeVarChar){
+                } else if (type == TypeVarChar) {
                     int strLen;
-                    memcpy(&strLen, (char *)data + dataOffset, sizeof(int));
-                    fieldOffset += sizeof(int);
-                    fieldOffset += strLen;
+                    memcpy(&strLen, (char *) data + dataOffset, sizeof(int));
                     dataOffset += sizeof(int);
+                    memcpy(record + fieldOffset, (char *) data + dataOffset, strLen);
+                    fieldOffset += strLen;
                     dataOffset += strLen;
                 }
-                memcpy(recordInfo + offset, &fieldOffset, sizeof(int));
                 offset += sizeof(int);
             }
         }
         free(nullIndicator);
-        dataSize = dataOffset - nullIndicatorSize;
     }
 
     int getSlotTable(char *page, int count, int size);
 
-    RC RecordBasedFileManager::insertRecordInNewPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const void *data, RID &rid, int &recordLength, char* &recordInfo, int &dataSize)
-    {
-        int slotSize = recordLength + dataSize;
-        char *newPage = (char*)calloc(PAGE_SIZE, 1);
+    RC RecordBasedFileManager::insertRecordInNewPage(FileHandle &fileHandle,
+                                                     const std::vector<Attribute> &recordDescriptor,
+                                                     RID &rid, char *&record, int &recordSize) {
+        int slotSize = recordSize;
+        char *newPage = (char *) calloc(PAGE_SIZE, 1);
         int slotCount = 0;
         int targetSlot = getSlotTable(newPage, slotCount, slotSize);
-        if (targetSlot != 0){
+        if (targetSlot != 0) {
 #ifdef DEBUG
             std::cerr << "Can not get slot table when insert record in a new page" << std::endl;
 #endif
             free(newPage);
             return -1;
-        }else{
+        } else {
             int offset = 0;
-            memcpy(newPage + offset, recordInfo, recordLength);
-            offset += recordLength;
-            int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-            memcpy(newPage + offset, (char *)data + nullIndicatorSize, dataSize);
+            memcpy(newPage + offset, record, recordSize);
             RC status = fileHandle.appendPage(newPage);
-            if (status == -1){
+            if (status == -1) {
 #ifdef DEBUG
                 std::cerr << "Can not append a page while insert a record" << std::endl;
 #endif
@@ -287,36 +306,46 @@ namespace PeterDB {
             return 0;
         }
     }
-    int RecordBasedFileManager::getSlotTable(char* &page, int &slotCount, int &slotSize){
+
+    int RecordBasedFileManager::getSlotTable(char *&page, int &slotCount, int &slotSize) {
+        //Get the slot count and slot size for the new record.
+        //Write the offset and slot size into the slot table of page memory.
         int newSlotCount = slotCount + 1;
-        //first set free space and slotCount, then directory(offset, slotSize)
+        //First set free space and slotCount, then directory(offset, slotSize)
         int freeSpace;
-        if(slotCount == 0){
+        if (slotCount == 0) {
             freeSpace = PAGE_SIZE;
-        }else{
+        } else {
             memcpy(&freeSpace, page + PAGE_SIZE - sizeof(int), sizeof(int));
         }
         freeSpace -= sizeof(int) * 2 + slotSize;
         memcpy(page + PAGE_SIZE - sizeof(int), &freeSpace, sizeof(int));
         memcpy(page + PAGE_SIZE - sizeof(int) * 2, &newSlotCount, sizeof(int));
-        if (slotCount == 0){
+        if (slotCount == 0) {
             int offset = 0;
             memcpy(page + PAGE_SIZE - sizeof(int) * 3, &offset, sizeof(int));
             memcpy(page + PAGE_SIZE - sizeof(int) * 4, &slotSize, sizeof(int));
-        }else{
+        } else {
             int previousOffset;
             memcpy(&previousOffset, page + PAGE_SIZE - sizeof(int) * (2 * slotCount + 2) + sizeof(int), sizeof(int));
             int previousSize;
             memcpy(&previousSize, page + PAGE_SIZE - sizeof(int) * (2 * slotCount + 2), sizeof(int));
-            memcpy(page + PAGE_SIZE - sizeof(int) * (2 * slotCount + 2) - sizeof(int), &previousOffset, sizeof(int));
-            memcpy(page + PAGE_SIZE - sizeof(int) * (2 * slotCount + 2) - sizeof(int) * 2, &previousSize, sizeof(int));
+            int newOffset = previousOffset + previousSize;
+            memcpy(page + PAGE_SIZE - sizeof(int) * (2 * slotCount + 2) - sizeof(int), &newOffset, sizeof(int));
+            memcpy(page + PAGE_SIZE - sizeof(int) * (2 * slotCount + 2) - sizeof(int) * 2, &slotSize, sizeof(int));
         }
         return slotCount;
     }
-    RC RecordBasedFileManager::insertRecordInOldPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, int pageNum, const void *data, RID &rid, int &recordLength, char* &recordInfo, int &dataSize){
-        char *oldPage = (char*)malloc(PAGE_SIZE);
+
+    RC RecordBasedFileManager::insertRecordInOldPage(FileHandle &fileHandle,
+                                                     const std::vector<Attribute> &recordDescriptor, int pageNum,
+                                                     RID &rid, char *&record,
+                                                     int &recordSize) {
+        //Insert record into existed page (specified by pageNum).
+        //Record is joined by recordInfo and data.
+        char *oldPage = (char *) malloc(PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, oldPage);
-        if (status == -1){
+        if (status == -1) {
 #ifdef DEBUG
             std::cerr << "Can not read page " << pageNum << " while insert record in old page" << std::endl;
 #endif
@@ -324,11 +353,11 @@ namespace PeterDB {
             return -1;
         }
         int freeSpace;
-        memcpy(&freeSpace, (char*)oldPage + PAGE_SIZE - sizeof(int), sizeof(int));
-        //slot size+ directory size(2 int)
-        int slotSize = recordLength + dataSize;
-        int needSpace = recordLength + dataSize + sizeof(int) * 2;
-        if(needSpace <= freeSpace){
+        memcpy(&freeSpace, (char *) oldPage + PAGE_SIZE - sizeof(int), sizeof(int));
+        //slot size + directory size(2 int)
+        int slotSize = recordSize;
+        int needSpace = recordSize + sizeof(int) * 2;
+        if (needSpace <= freeSpace) {
             int slotCount;
             memcpy(&slotCount, oldPage + PAGE_SIZE - sizeof(int) * 2, sizeof(int));
             int targetSlot = getSlotTable(oldPage, slotCount, slotSize);
@@ -337,12 +366,9 @@ namespace PeterDB {
             int lastLength;
             memcpy(&lastLength, oldPage + PAGE_SIZE - sizeof(int) * (2 * slotCount + 2), sizeof(int));
             int offset = lastOffset + lastLength;
-            memcpy(oldPage + offset, recordInfo, recordLength);
-            offset += recordLength;
-            int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-            memcpy(oldPage + offset, (char *)data + nullIndicatorSize, dataSize);
+            memcpy(oldPage + offset, record, recordSize);
             status = fileHandle.writePage(pageNum, oldPage);
-            if (status == -1){
+            if (status == -1) {
 #ifdef DEBUG
                 std::cerr << "Can not write page " << pageNum << std::endl;
 #endif
