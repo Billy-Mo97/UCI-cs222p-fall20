@@ -38,9 +38,10 @@ namespace PeterDB {
     RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                             const void *data, RID &rid) {
         //Change format of record
-        int recordSize;
+        int recordSize = 0;
         char *record;
         getFieldInfo(recordDescriptor, data,record, recordSize);
+        //std::cout << "recordSize: " << recordSize << std::endl;
         int numOfPages = fileHandle.getNumberOfPages();
         if (numOfPages > 0) {
             //Insert into current page
@@ -97,6 +98,7 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                           const RID &rid, void *data) {
+        //std::cout << "rid:" << rid.pageNum << "," << rid.slotNum << std::endl;
         int pageNum = rid.pageNum, slotNum = rid.slotNum;
         char *page = (char *) malloc(PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, page);
@@ -107,28 +109,65 @@ namespace PeterDB {
             free(page);
             return -1;
         }
+        //offset: pointer in the page
+        //dataOffset: pointer to iterate through data
         int offset;
         memcpy(&offset, page + PAGE_SIZE - sizeof(int) * (2 + 2 * slotNum) - sizeof(int), sizeof(int));
-        int dataLen;
-        memcpy(&dataLen, page + PAGE_SIZE - sizeof(int) * (2 + 2 * slotNum) - 2 * sizeof(int), sizeof(int));
-        int dataEnd = offset + dataLen;
+        int recordLen;
+        memcpy(&recordLen, page + PAGE_SIZE - sizeof(int) * (2 + 2 * slotNum) - 2 * sizeof(int), sizeof(int));
         int nullBit = 0, dataOffset = 0;
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
         char *nullIndicator = (char *) malloc(nullIndicatorSize);
-        //num of fields
+        //Skip num of fields, get null indicator
         offset += sizeof(int);
         memcpy(nullIndicator, (char *) page + offset, nullIndicatorSize);
         memcpy(data, (char *) page + offset, nullIndicatorSize);
         dataOffset += nullIndicatorSize;
         offset += nullIndicatorSize;
-        //offsets of non null fields
+        //First get the number of non null fields, then skip their offsets.
         int nonNull = 0;
         for (int i = 0; i < recordDescriptor.size(); i++) {
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
             if (nullBit == 0) { nonNull++; }
         }
+        int fieldOffset = offset;
         offset += nonNull * sizeof(int);
-        memcpy((char *) data + dataOffset, (char *) page + offset, dataEnd - offset);
+        for (int i = 0; i < recordDescriptor.size(); i++) {
+            nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
+            if (nullBit == 0) {
+                AttrType type = recordDescriptor[i].type;
+                if (type == TypeInt) {
+                    //int intVal;
+                    memcpy((char *)data + dataOffset, (char *) page + offset, sizeof(int));
+                    //memcpy(&intVal, (char *) page + offset, sizeof(int));
+                    //std::cout << intVal << ", ";
+                    dataOffset += sizeof(int);
+                    offset += sizeof(int);
+                } else if (type == TypeReal) {
+                    //float realVal;
+                    //memcpy(&realVal, (char *) page + offset, sizeof(float));
+                    memcpy((char *)data + dataOffset, (char *) page + offset, sizeof(float));
+                    //std::cout << realVal << ", ";
+                    dataOffset += sizeof(float);
+                    offset += sizeof(float);
+                } else if (type == TypeVarChar) {
+                    int strLen, prevEnd = offset, curEnd;
+                    memcpy(&curEnd, (char *) page + fieldOffset, sizeof(int));
+                    strLen = curEnd - prevEnd;
+                    memcpy((char *)data + dataOffset, (char *) page + offset, strLen);
+                    //char *str = (char *) malloc(strLen + 1);
+                    //memcpy(str, (char *) page + offset, strLen);
+                    //str[strLen] = '\0';
+                    //std::cout << str << ", ";
+                    //free(str);
+                    offset += strLen;
+                    dataOffset += strLen;
+                }
+                fieldOffset += sizeof(int);
+                //std::cout << "offset: " << offset << std::endl;
+                //std::cout << "fieldOffset: " << fieldOffset << std::endl;
+            }
+        }
         free(page);
         free(nullIndicator);
         return 0;
@@ -150,10 +189,12 @@ namespace PeterDB {
         char *nullIndicator = (char *) malloc(nullIndicatorSize);
         memcpy(nullIndicator, (char *) data + offset, nullIndicatorSize);
         offset += nullIndicatorSize;
+        std::cout << "offset: " << offset << std::endl;
         //Then, follow recordDescriptor to iterate through the data.
         //If the attribute is not null, print it out with certain type.
         for (int i = 0; i < recordDescriptor.size(); i++) {
             out << recordDescriptor[i].name << ": ";
+            //std::cout << recordDescriptor[i].name << ": ";
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
             if (nullBit == 0) {
                 AttrType type = recordDescriptor[i].type;
@@ -161,31 +202,40 @@ namespace PeterDB {
                     int val;
                     memcpy(&val, (char *) data + offset, sizeof(int));
                     out << val;
+                    //std::cout << val;
                     offset += sizeof(int);
                 } else if (type == TypeReal) {
                     float val;
                     memcpy(&val, (char *) data + offset, sizeof(float));
                     out << val;
+                    //std::cout << val;
                     offset += sizeof(float);
                 } else if (type == TypeVarChar) {
                     int strLen;
                     memcpy(&strLen, (char *) data + offset, sizeof(int));
                     offset += sizeof(int);
+                    std::cout << "offset: " << offset << std::endl;
                     char *str = (char *) malloc(strLen + 1);
+                    memset(str, 0, strLen + 1);
                     str[strLen] = '\0';
                     memcpy(str, (char *) data + offset, strLen);
                     out << str;
+                    //std::cout << str;
                     offset += strLen;
                     free(str);
                 }
             } else {
                 out << "NULL";
+                //std::cout << "NULL";
             }
             if (i != recordDescriptor.size() - 1) {
                 out << ", ";
+                //std::cout << ", ";
             }
+            std::cout << "offset: " << offset << std::endl;
         }
-        //out << std::endl;
+        out << std::endl;
+        //std::cout << std::endl;
         free(nullIndicator);
         return 0;
     }
@@ -227,28 +277,46 @@ namespace PeterDB {
         int nonNull = 0;
         for (int i = 0; i < recordDescriptor.size(); i++) {
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
-            if (nullBit == 0) {
-                nonNull++;
-                recordSize += recordDescriptor[i].length;
-            }
+            if (nullBit == 0) { nonNull++; }
         }
         //Record first three parts consist of fieldsNum, null indicator, offsets of fields
         //Allocate memory for record
         infoSize = sizeof(int) + nullIndicatorSize + nonNull * sizeof(int);
-        record = (char *) malloc(infoSize);
+        //std::cout << sizeof(int) << "+" << nullIndicatorSize << "+" << nonNull * sizeof(int) << "+" << recordSize << std::endl;
+        recordSize += infoSize;
+        int dataPointer = nullIndicatorSize;
+        for (int i = 0; i < recordDescriptor.size(); i++) {
+            nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
+            if (nullBit == 0) {
+                AttrType type = recordDescriptor[i].type;
+                if (type == TypeInt) {
+                    dataPointer += sizeof(int);
+                    recordSize += sizeof(int);
+                } else if (type == TypeReal) {
+                    dataPointer += sizeof(float);
+                    recordSize += sizeof(float);
+                } else if (type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, (char *) data + dataPointer, sizeof(int));
+                    dataPointer += sizeof(int) + strLen;
+                    recordSize += strLen;
+                }
+            }
+        }
+        record = (char *) malloc(recordSize);
         //Assign fieldsNum
         memcpy(record + offset, &fieldsNum, sizeof(int));
         offset += sizeof(int);
         //Assign null indicator
-        memcpy(record + offset, (char *) nullIndicator, sizeof(nullIndicatorSize));
-        offset += sizeof(nullIndicatorSize);
+        memcpy(record + offset, (char *) nullIndicator, nullIndicatorSize);
+        offset += nullIndicatorSize;
         //Assign offsets and recordData.
         //fieldOffset is set to the start of actual data in the record
         int fieldOffset = offset + nonNull * sizeof(int);
+        //std::cout << "field offset:" << sizeof(int) << "+" << nullIndicatorSize << "+" << nonNull * sizeof(int) << std::endl;
         for (int i = 0; i < recordDescriptor.size(); i++) {
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
             if (nullBit == 0) {
-                memcpy(record + offset, &fieldOffset, sizeof(int));
                 AttrType type = recordDescriptor[i].type;
                 if (type == TypeInt) {
                     memcpy(record + fieldOffset, (char *) data + dataOffset, sizeof(int));
@@ -263,10 +331,17 @@ namespace PeterDB {
                     memcpy(&strLen, (char *) data + dataOffset, sizeof(int));
                     dataOffset += sizeof(int);
                     memcpy(record + fieldOffset, (char *) data + dataOffset, strLen);
+                    char *str = (char *) malloc(strLen + 1);
+                    memset(str, 0, strLen + 1);
+                    str[strLen] = '\0';
+                    memcpy(str, (char *) record + fieldOffset, strLen);
+                    free(str);
                     fieldOffset += strLen;
                     dataOffset += strLen;
                 }
+                memcpy(record + offset, &fieldOffset, sizeof(int));
                 offset += sizeof(int);
+                //std::cout << "field offset:" << fieldOffset << std::endl;
             }
         }
         free(nullIndicator);
