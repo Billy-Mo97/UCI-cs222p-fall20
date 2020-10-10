@@ -138,7 +138,19 @@ namespace PeterDB {
         ~RecordBasedFileManager();                                                  // Prevent unwanted destruction
         RecordBasedFileManager(const RecordBasedFileManager &);                     // Prevent construction by copying
         RecordBasedFileManager &operator=(const RecordBasedFileManager &);          // Prevent assignment
+        PagedFileManager* pagedFileManager;
 
+
+        void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, char *&record, int &size);
+
+        int getSlotTable(char *&page, int &slotCount, int &slotSize);
+
+        RC
+        insertRecordInNewPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
+                              RID &rid, char *&record, int &recordSize);
+
+        RC insertRecordInOldPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, int pageNum,
+                                 RID &rid, char *&record, int &recordSize);
     };
 
 } // namespace PeterDB

@@ -19,9 +19,8 @@ namespace PeterDB {
     PagedFileManager &PagedFileManager::operator=(const PagedFileManager &) = default;
 
     RC PagedFileManager::createFile(const std::string &fileName) {
-        struct stat buffer;
         //If the file has existed.
-        if (stat(fileName.c_str(), &buffer) == 0) {
+        if (fopen(fileName.c_str(), "r") != NULL) {
             return -1;
         } else {
             FILE *file;
