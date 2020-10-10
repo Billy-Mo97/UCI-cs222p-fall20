@@ -40,8 +40,7 @@ namespace PeterDB {
         //Change format of record
         int recordSize = 0;
         char *record;
-        getFieldInfo(recordDescriptor, data,record, recordSize);
-        //std::cout << "recordSize: " << recordSize << std::endl;
+        getFieldInfo(recordDescriptor, data, record, recordSize);
         int numOfPages = fileHandle.getNumberOfPages();
         if (numOfPages > 0) {
             //Insert into current page
@@ -49,14 +48,14 @@ namespace PeterDB {
                                               record, recordSize);
             if (status == -1) {
 #ifdef DEBUG
-                std::cerr << "Can not insert record in current page" << std::endl;
-#endif          //linearly scan pages with enough space to insert
+                //std::cerr << "Can not insert record in current page" << std::endl;
+#endif          //Linearly scan pages with enough space to insert
                 for (int i = 0; i < numOfPages - 1; i++) {
                     status = insertRecordInOldPage(fileHandle, recordDescriptor, i, rid, record,
                                                    recordSize);
                     if (status == -1) {
 #ifdef DEBUG
-                        std::cerr << "Can not insert record in page:" << i << std::endl;
+                        //std::cerr << "Can not insert record in page:" << i << std::endl;
 #endif
                     } else {
                         free(record);
@@ -68,7 +67,7 @@ namespace PeterDB {
                                                recordSize);
                 if (status == -1) {
 #ifdef DEBUG
-                    std::cerr << "Can not insert record in new page:" << std::endl;
+                    //std::cerr << "Can not insert record in new page:" << std::endl;
 #endif
                     free(record);
                     return -1;
@@ -85,7 +84,7 @@ namespace PeterDB {
                                               recordSize);
             if (status == -1) {
 #ifdef DEBUG
-                std::cerr << "Can not insert record in new page:" << std::endl;
+                //std::cerr << "Can not insert record in new page:" << std::endl;
 #endif
                 free(record);
                 return -1;
@@ -104,7 +103,7 @@ namespace PeterDB {
         RC status = fileHandle.readPage(pageNum, page);
         if (status == -1) {
 #ifdef DEBUG
-            std::cerr << "Can not read page " << pageNum << " while read record" << std::endl;
+            //std::cerr << "Can not read page " << pageNum << " while read record" << std::endl;
 #endif
             free(page);
             return -1;
@@ -115,6 +114,7 @@ namespace PeterDB {
         memcpy(&offset, page + PAGE_SIZE - sizeof(int) * (2 + 2 * slotNum) - sizeof(int), sizeof(int));
         int recordLen;
         memcpy(&recordLen, page + PAGE_SIZE - sizeof(int) * (2 + 2 * slotNum) - 2 * sizeof(int), sizeof(int));
+        int fieldStart = offset;
         int nullBit = 0, dataOffset = 0;
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
         char *nullIndicator = (char *) malloc(nullIndicatorSize);
@@ -132,13 +132,14 @@ namespace PeterDB {
         }
         int fieldOffset = offset;
         offset += nonNull * sizeof(int);
+        fieldStart += sizeof(int) + nullIndicatorSize;
         for (int i = 0; i < recordDescriptor.size(); i++) {
             nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
             if (nullBit == 0) {
                 AttrType type = recordDescriptor[i].type;
                 if (type == TypeInt) {
                     //int intVal;
-                    memcpy((char *)data + dataOffset, (char *) page + offset, sizeof(int));
+                    memcpy((char *) data + dataOffset, (char *) page + offset, sizeof(int));
                     //memcpy(&intVal, (char *) page + offset, sizeof(int));
                     //std::cout << intVal << ", ";
                     dataOffset += sizeof(int);
@@ -146,18 +147,22 @@ namespace PeterDB {
                 } else if (type == TypeReal) {
                     //float realVal;
                     //memcpy(&realVal, (char *) page + offset, sizeof(float));
-                    memcpy((char *)data + dataOffset, (char *) page + offset, sizeof(float));
+                    memcpy((char *) data + dataOffset, (char *) page + offset, sizeof(float));
                     //std::cout << realVal << ", ";
                     dataOffset += sizeof(float);
                     offset += sizeof(float);
                 } else if (type == TypeVarChar) {
-                    int strLen, prevEnd = offset, curEnd;
+                    int strLen, prevEnd, curEnd;
+                    if (fieldOffset == fieldStart) { prevEnd = sizeof(int) + nullIndicatorSize +
+                                                                                    sizeof(int) * nonNull;
+                    }
+                    else { memcpy(&prevEnd, (char *) page + fieldOffset - sizeof(int), sizeof(int)); }
                     memcpy(&curEnd, (char *) page + fieldOffset, sizeof(int));
                     strLen = curEnd - prevEnd;
-                    memcpy((char *)data + dataOffset, &strLen, sizeof(int));
+                    memcpy((char *) data + dataOffset, &strLen, sizeof(int));
                     dataOffset += sizeof(int);
-                    memcpy((char *)data + dataOffset, (char *) page + offset, strLen);
-                    //char *str = (char *) malloc(strLen + 1);
+                    memcpy((char *) data + dataOffset, (char *) page + offset, strLen);
+                    char *str = (char *) malloc(strLen + 1);
                     //memcpy(str, (char *) page + offset, strLen);
                     //str[strLen] = '\0';
                     //std::cout << str << ", ";
@@ -166,7 +171,6 @@ namespace PeterDB {
                     dataOffset += strLen;
                 }
                 fieldOffset += sizeof(int);
-                //std::cout << "offset: " << offset << std::endl;
                 //std::cout << "fieldOffset: " << fieldOffset << std::endl;
             }
         }
@@ -191,7 +195,6 @@ namespace PeterDB {
         char *nullIndicator = (char *) malloc(nullIndicatorSize);
         memcpy(nullIndicator, (char *) data + offset, nullIndicatorSize);
         offset += nullIndicatorSize;
-        std::cout << "offset: " << offset << std::endl;
         //Then, follow recordDescriptor to iterate through the data.
         //If the attribute is not null, print it out with certain type.
         for (int i = 0; i < recordDescriptor.size(); i++) {
@@ -216,7 +219,6 @@ namespace PeterDB {
                     int strLen;
                     memcpy(&strLen, (char *) data + offset, sizeof(int));
                     offset += sizeof(int);
-                    std::cout << "offset: " << offset << std::endl;
                     char *str = (char *) malloc(strLen + 1);
                     memset(str, 0, strLen + 1);
                     str[strLen] = '\0';
@@ -234,7 +236,6 @@ namespace PeterDB {
                 out << ", ";
                 //std::cout << ", ";
             }
-            std::cout << "offset: " << offset << std::endl;
         }
         out << std::endl;
         //std::cout << std::endl;
@@ -355,12 +356,12 @@ namespace PeterDB {
                                                      const std::vector<Attribute> &recordDescriptor,
                                                      RID &rid, char *&record, int &recordSize) {
         int slotSize = recordSize;
-        char *newPage = (char *) calloc(PAGE_SIZE, 1);
+        char *newPage = (char *) malloc(PAGE_SIZE);
         int slotCount = 0;
         int targetSlot = getSlotTable(newPage, slotCount, slotSize);
         if (targetSlot != 0) {
 #ifdef DEBUG
-            std::cerr << "Can not get slot table when insert record in a new page" << std::endl;
+            //std::cerr << "Can not get slot table when insert record in a new page" << std::endl;
 #endif
             free(newPage);
             return -1;
@@ -370,7 +371,7 @@ namespace PeterDB {
             RC status = fileHandle.appendPage(newPage);
             if (status == -1) {
 #ifdef DEBUG
-                std::cerr << "Can not append a page while insert a record" << std::endl;
+                //std::cerr << "Can not append a page while insert a record" << std::endl;
 #endif
                 free(newPage);
                 return -1;
@@ -423,7 +424,7 @@ namespace PeterDB {
         RC status = fileHandle.readPage(pageNum, oldPage);
         if (status == -1) {
 #ifdef DEBUG
-            std::cerr << "Can not read page " << pageNum << " while insert record in old page" << std::endl;
+            //std::cerr << "Can not read page " << pageNum << " while insert record in old page" << std::endl;
 #endif
             free(oldPage);
             return -1;
@@ -446,7 +447,7 @@ namespace PeterDB {
             status = fileHandle.writePage(pageNum, oldPage);
             if (status == -1) {
 #ifdef DEBUG
-                std::cerr << "Can not write page " << pageNum << std::endl;
+                //std::cerr << "Can not write page " << pageNum << std::endl;
 #endif
                 free(oldPage);
                 return -1;
