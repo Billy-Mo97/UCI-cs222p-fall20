@@ -154,6 +154,8 @@ namespace PeterDB {
                     int strLen, prevEnd = offset, curEnd;
                     memcpy(&curEnd, (char *) page + fieldOffset, sizeof(int));
                     strLen = curEnd - prevEnd;
+                    memcpy((char *)data + dataOffset, &strLen, sizeof(int));
+                    dataOffset += sizeof(int);
                     memcpy((char *)data + dataOffset, (char *) page + offset, strLen);
                     //char *str = (char *) malloc(strLen + 1);
                     //memcpy(str, (char *) page + offset, strLen);
