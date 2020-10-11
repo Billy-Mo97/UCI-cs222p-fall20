@@ -29,7 +29,7 @@ namespace PeterDB {
                 return -1;
             } else {
                 //If the file has been successfully created,
-                //initiate readPageCount, writePageCount, appendPageCount to 0,
+                //initiate readPageCount, writePageCount, appendPageCount, numOfPages to 0,
                 //write them to the hidden page of the file (first page).
                 unsigned readNum = 0, writeNum = 0, appendNum = 0, pageNum = 0;
                 fseek(file, 0, SEEK_SET);
