@@ -123,7 +123,7 @@
     {
       "name": "RBFM_Test.insert_and_read_a_record_with_null",
       "setup": "",
-      "run": "cd cmake-build-debug && CTEST_OUTPUT_ON_FAILURE=1 ctest . -R RBFM_Test.insert_and_read_a_record",
+      "run": "cd cmake-build-debug && CTEST_OUTPUT_ON_FAILURE=1 ctest . -R RBFM_Test.insert_and_read_a_record_with_null",
       "input": "",
       "output": "",
       "comparison": "included",
