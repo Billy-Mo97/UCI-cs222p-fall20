@@ -62,6 +62,7 @@ namespace PeterDB {
         if (stat(fileName.c_str(), &buffer) == 0) {
             //Initiate the file pointer of FileHandle instance.
             if (fileHandle.initPointer(fileName) == 0) {
+                fileHandle.readPageCounter++;
                 return 0;
             } else { return -1; }
         } else { return -1; }
