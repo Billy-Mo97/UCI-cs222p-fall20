@@ -404,13 +404,55 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                              const RID &rid, const std::string &attributeName, void *data) {
-        return -1;
+        char *record = (char *) malloc(PAGE_SIZE);
+        RC status = readRecord(fileHandle, recordDescriptor, rid, record);
+        if (status == -1) {
+#ifdef DEBUG
+            std::cerr << "Cannot read record when reading attribute." << std::endl;
+#endif
+            free(record);
+            return -1;
+        }
+        int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        short offset = nullIndicatorSize;
+        for (int i = 0; i < recordDescriptor.size(); i++) {
+            int nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
+            if (nullBit == 0) {
+                AttrType type = recordDescriptor[i].type;
+                std::string name = recordDescriptor[i].name;
+                if (type == TypeInt) {
+                    if (name == attributeName) {
+                        memcpy((char *) data, (char *) record + offset, sizeof(int));
+                        break;
+                    }
+                    offset += sizeof(int);
+                } else if (type == TypeReal) {
+                    if (name == attributeName) {
+                        memcpy((char *) data, (char *) record + offset, sizeof(float));
+                        break;
+                    }
+                    offset += sizeof(float);
+                } else if (type == TypeVarChar) {
+                    if (name == attributeName) {
+                        int strLen;
+                        memcpy(&strLen, record + offset, sizeof(int));
+                        memcpy((char *) data, (char *) record + offset, sizeof(int) + strLen);
+                        break;
+                    }
+                }
+            }
+        }
+        free(nullIndicator);
+        free(record);
+        return 0;
     }
 
     RC RecordBasedFileManager::scan(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                     const std::string &conditionAttribute, const CompOp compOp, const void *value,
                                     const std::vector<std::string> &attributeNames,
                                     RBFM_ScanIterator &rbfm_ScanIterator) {
+
         return -1;
     }
 
