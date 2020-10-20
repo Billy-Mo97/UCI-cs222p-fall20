@@ -35,6 +35,11 @@ namespace PeterDB {
         NE_OP,      // !=
         NO_OP       // no condition
     } CompOp;
+    struct Tombstone {//7 bytes
+        char flag;
+        int pageNum;
+        short slotNum;
+    };
 
 
     /********************************************************************
@@ -141,16 +146,18 @@ namespace PeterDB {
         PagedFileManager* pagedFileManager;
 
 
-        void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, char *&record, int &size);
+        void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, char *&record, short &size);
 
-        int getSlotTable(char *&page, int &slotCount, int &slotSize);
+        short getSlotTable(char *&page, short &slotCount, short &slotSize);
 
         RC
         insertRecordInNewPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
-                              RID &rid, char *&record, int &recordSize);
+                              RID &rid, char *&record, short &recordSize);
 
         RC insertRecordInOldPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, int pageNum,
-                                 RID &rid, char *&record, int &recordSize);
+                                 RID &rid, char *&record, short &recordSize);
+
+        void shiftSlots(short targetOffset, short begin, short end, char *&page);
     };
 
 } // namespace PeterDB

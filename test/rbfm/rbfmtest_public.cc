@@ -11,7 +11,6 @@ namespace PeterDBTesting {
         // 4. Read Record
         // 5. Close Record-Based File
         // 6. Destroy Record-Based File
-
         PeterDB::RID rid;
         int recordSize = 0;
         inBuffer = malloc(100);
@@ -22,7 +21,10 @@ namespace PeterDBTesting {
 
         // Initialize a NULL field indicator
         nullsIndicator = initializeNullFieldsIndicator(recordDescriptor);
-
+        std::string midString;
+        for (int i = 0; i < 100; i++) {
+            midString.push_back('m');
+        }
         // Insert a inBuffer into a file and print the inBuffer
         prepareRecord(recordDescriptor.size(), nullsIndicator, 8, "Anteater", 25, 177.8, 6200, inBuffer, &recordSize);
 
@@ -112,7 +114,7 @@ namespace PeterDBTesting {
 
         PeterDB::RID rid;
         inBuffer = malloc(1000);
-        int numRecords = 2000;
+        int numRecords = 2000;//original:2000
 
         // clean caches
         rids.clear();
@@ -122,8 +124,8 @@ namespace PeterDBTesting {
         createLargeRecordDescriptor(recordDescriptor);
 
         for (PeterDB::Attribute &i : recordDescriptor) {
-            GTEST_LOG_(INFO) << "Attr Name: " << i.name << " Attr Type: " << (PeterDB::AttrType) i.type
-                             << " Attr Len: " << i.length;
+            //GTEST_LOG_(INFO) << "Attr Name: " << i.name << " Attr Type: " << (PeterDB::AttrType) i.type
+              //               << " Attr Len: " << i.length;
         }
 
         // NULL field indicator
@@ -144,7 +146,7 @@ namespace PeterDBTesting {
             rids.push_back(rid);
             sizes.push_back(size);
         }
-
+        std::cout<<"insert multiple complete"<<std::endl;
         ASSERT_EQ(rids.size(), numRecords) << "Reading records should succeed.";
         ASSERT_EQ(sizes.size(), (unsigned) numRecords) << "Reading records should succeed.";
 
@@ -155,7 +157,7 @@ namespace PeterDBTesting {
             memset(outBuffer, 0, 1000);
             ASSERT_EQ(rbfm.readRecord(fileHandle, recordDescriptor, rids[i], outBuffer), success)
                                         << "Reading a record should succeed.";
-
+            //std::cout<<"read multiple complete:"<<i<<std::endl;
             if (i % 1000 == 0) {
                 std::ostringstream stream;
                 rbfm.printRecord(recordDescriptor, outBuffer, stream);
@@ -165,7 +167,7 @@ namespace PeterDBTesting {
             int size = 0;
             prepareLargeRecord(recordDescriptor.size(), nullsIndicator, i, inBuffer, &size);
             ASSERT_EQ(memcmp(outBuffer, inBuffer, sizes[i]), 0) << "the read data should match the inserted data";
-        }
+        }std::cout<<"read multiple complete"<<std::endl;
 
     }
 

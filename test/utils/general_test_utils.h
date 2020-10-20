@@ -48,6 +48,7 @@ namespace PeterDBTesting {
         std::ifstream in2(fileName2.c_str(), std::ifstream::in | std::ifstream::binary);
         in2.seekg(0, std::ifstream::end);
         s2 = in2.tellg();
+        std::cout<<fileName1<<":"<<s1<<" "<<fileName2<<":"<<s2<<std::endl;
         return s1 == s2;
     }
 
