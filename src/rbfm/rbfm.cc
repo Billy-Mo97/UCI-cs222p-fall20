@@ -126,7 +126,7 @@ namespace PeterDB {
         }else{
             //offset: pointer in the page
             //dataOffset: pointer to iterate through data
-            std::cout << "readRecord page:"<<pageNum<<" slot:"<<slotNum<< std::endl;
+            //std::cout << "readRecord page:"<<pageNum<<" slot:"<<slotNum<< std::endl;
             short fieldStart = offset;
             int nullBit = 0; short dataOffset = 0;
             int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
@@ -181,7 +181,7 @@ namespace PeterDB {
                     //std::cout << "fieldOffset: " << fieldOffset << std::endl;
                 }
             }
-            std::cout << "readRecord complete page:"<<pageNum<<" slot:"<<slotNum<< std::endl;
+            //std::cout << "readRecord complete page:"<<pageNum<<" slot:"<<slotNum<< std::endl;
             free(page);
             free(nullIndicator);
             return 0;
@@ -590,7 +590,8 @@ namespace PeterDB {
         memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
         //memcpy(page + PAGE_SIZE - sizeof(int) * 2, &newSlotCount, sizeof(int));
         if (slotCount == 0) {
-            short offset = 0;
+            short offset = 0,newFreeSpace = freeSpace - 4 * sizeof(short);
+            memcpy(page + PAGE_SIZE - sizeof(short), &newFreeSpace, sizeof(short));
             memcpy(page + PAGE_SIZE - sizeof(short) * 3, &offset, sizeof(short));
             memcpy(page + PAGE_SIZE - sizeof(short) * 4, &slotSize, sizeof(short));
             memcpy(page + PAGE_SIZE - sizeof(short) * 2, &newSlotCount, sizeof(short));

@@ -20,10 +20,11 @@ namespace PeterDB {
 
     RC PagedFileManager::createFile(const std::string &fileName) {
         //If the file has existed.
-        if (fopen(fileName.c_str(), "r") != NULL) {
+        FILE *file;
+        if ((file=fopen(fileName.c_str(), "r"))!= NULL) {
+            fclose(file);
             return -1;
         } else {
-            FILE *file;
             file = fopen(fileName.c_str(), "w+b");
             if (file == NULL) {
                 return -1;
@@ -106,6 +107,7 @@ namespace PeterDB {
         int result = fwrite(data, 1, PAGE_SIZE, pointer);
         if (result != PAGE_SIZE) { return -1; }
         else {
+            fflush(pointer);
             writePageCounter++;
             return 0;
         }
@@ -165,6 +167,7 @@ namespace PeterDB {
         fwrite(&writePageCounter, sizeof(unsigned), 1, pointer);
         fwrite(&appendPageCounter, sizeof(unsigned), 1, pointer);
         fwrite(&numOfPages, sizeof(unsigned), 1, pointer);
+        fflush(pointer);
         if (fclose(pointer) == 0) { return 0; }
         else { return -1; }
     }

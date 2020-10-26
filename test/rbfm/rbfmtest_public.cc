@@ -50,43 +50,6 @@ namespace PeterDBTesting {
         ASSERT_EQ(memcmp(inBuffer, outBuffer, recordSize), 0) << "the read data should match the inserted data";
 
     }
-    TEST_F(RBFM_Test, insert_and_read_an_attribute) {
-        // Functions tested
-        // 1. Create Record-Based File
-        // 2. Open Record-Based File
-        // 3. Insert Record
-        // 4. Read Record
-        // 5. Close Record-Based File
-        // 6. Destroy Record-Based File
-        PeterDB::RID rid;
-        size_t recordSize = 0;
-        inBuffer = malloc(100);
-        outBuffer = malloc(100);
-
-        std::vector<PeterDB::Attribute> recordDescriptor;
-        createRecordDescriptor(recordDescriptor);
-
-        // Initialize a NULL field indicator
-        nullsIndicator = initializeNullFieldsIndicator(recordDescriptor);
-        // Insert a inBuffer into a file and print the inBuffer
-        prepareRecord(recordDescriptor.size(), nullsIndicator, 8, "Anteater", 25, 177.8, 6200, inBuffer, recordSize);
-
-        std::ostringstream stream;
-        ASSERT_EQ(rbfm.insertRecord(fileHandle, recordDescriptor, inBuffer, rid), success)
-                                    << "Inserting a inBuffer should succeed.";
-        std::string attribute = "name";
-        std::string value = "Anteater";
-        // Given the rid, read the inBuffer from file
-        ASSERT_EQ(rbfm.readAttribute(fileHandle, recordDescriptor, rid, attribute,outBuffer), success)
-                                    << "Reading a inBuffer should succeed.";
-        printf("outbuffer:%s",(char*)outBuffer);
-        stream.str(std::string());
-        stream.clear();
-
-        // Compare whether the two memory blocks are the same
-        ASSERT_EQ(memcmp(&value, outBuffer, 8), 0) << "the read data should match the inserted data";
-
-    }
 
     TEST_F(RBFM_Test, insert_and_read_a_record_with_null) {
         // Functions tested
