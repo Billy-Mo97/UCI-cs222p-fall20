@@ -434,12 +434,21 @@ namespace PeterDB {
                     }
                     offset += sizeof(float);
                 } else if (type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, record + offset, sizeof(int));
                     if (name == attributeName) {
-                        int strLen;
-                        memcpy(&strLen, record + offset, sizeof(int));
                         memcpy((char *) data, (char *) record + offset, sizeof(int) + strLen);
                         break;
                     }
+                    offset += sizeof(int) + strLen;
+                }
+            }//if attribute is null
+            else{
+                std::string name = recordDescriptor[i].name;
+                if (name == attributeName){
+                    char null = -1;
+                    memcpy((char *) data, &null, sizeof(char ));
+                    break;
                 }
             }
         }
@@ -452,8 +461,121 @@ namespace PeterDB {
                                     const std::string &conditionAttribute, const CompOp compOp, const void *value,
                                     const std::vector<std::string> &attributeNames,
                                     RBFM_ScanIterator &rbfm_ScanIterator) {
+        rbfm_ScanIterator.curPage = 0;
+        rbfm_ScanIterator.curSlot = -1;
+        rbfm_ScanIterator.maxPage = fileHandle.numOfPages - 1;
+        rbfm_ScanIterator.setFileHandle(fileHandle);
+        rbfm_ScanIterator.setRecordDescriptor(recordDescriptor);
+        for(int i = 0;i < recordDescriptor.size();i++){
+            if(recordDescriptor[i].name == conditionAttribute){
+                rbfm_ScanIterator.setConditionPos(i);
+                rbfm_ScanIterator.setConditionAttribute(conditionAttribute);
+                break;
+            }
+        }
+        rbfm_ScanIterator.setValue(value);
+        rbfm_ScanIterator.setAttributeNames(attributeNames);
+        rbfm_ScanIterator.setCompOp(compOp);
+        return 0;
+    }
 
-        return -1;
+    RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data){
+        for(int i = curPage;i < maxPage;i++){
+            char* page = (char*)malloc(PAGE_SIZE);
+            fileHandle->readPage(i,page);
+            short slotCount;
+            memcpy(&slotCount, page + PAGE_SIZE - 2 * sizeof(short), sizeof(short ));
+            int startSlot = 0;
+            if(i == curPage) startSlot = curSlot + 1;
+            for(int j = startSlot;j < slotCount;j++){
+                short slotOffset;
+                memcpy(&slotOffset, page + PAGE_SIZE - sizeof(short) * (3 + 2 * j), sizeof(short ));
+                //if not deleted
+                if(slotOffset!=-1){
+                    char flag;
+                    memcpy(&flag, page + slotOffset, sizeof(char));
+                    //if tombstone, continue
+                    if(flag == -1) continue;
+                    else{
+                        char* condition = (char*)malloc(PAGE_SIZE);
+                        //read condition
+                        RecordBasedFileManager& rbfm = RecordBasedFileManager::instance();
+                        rbfm.readAttribute(*fileHandle, recordDescriptor, rid, conditionAttribute,condition);
+                        //compare condition with value using compOperator
+                        AttrType type = recordDescriptor.at(conditionPos).type;
+                        if(type == TypeInt){
+                            int val;
+                            memcpy(&val, condition, sizeof(int));
+                            int conditionVal;
+                            memcpy(&conditionVal, value, sizeof(int));
+                            if(val - conditionVal > 0 && (compOp == NO_OP || compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP)) continue;
+                            if(val - conditionVal == 0 && (compOp == NO_OP || compOp == LT_OP || compOp == GT_OP)) continue;
+                            if(val - conditionVal < 0 && (compOp == NO_OP || compOp == GE_OP || compOp == GE_OP || compOp == EQ_OP)) continue;
+                        }else if(type == TypeReal){
+                            float val;
+                            memcpy(&val, condition, sizeof(float ));
+                            float conditionVal;
+                            memcpy(&conditionVal, value, sizeof(float ));
+                            if(val - conditionVal > 0 && (compOp == NO_OP || compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP)) continue;
+                            if(val - conditionVal == 0 && (compOp == NO_OP || compOp == LT_OP || compOp == GT_OP)) continue;
+                            if(val - conditionVal < 0 && (compOp == NO_OP || compOp == GE_OP || compOp == GE_OP || compOp == EQ_OP)) continue;
+                        }else if(type == TypeVarChar){
+                            int strLen;
+                            memcpy(&strLen, condition, sizeof(int));
+                            char* val;
+                            char* conditionVal;
+                            memcpy(val, (char*)condition + sizeof(int), strLen);
+                            memcpy(conditionVal, (char*)value + sizeof(int), strLen);
+                            if(strcmp(val,conditionVal) > 0 && (compOp == NO_OP || compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP)) continue;
+                            if(strcmp(val,conditionVal) && (compOp == NO_OP || compOp == LT_OP || compOp == GT_OP)) continue;
+                            if(strcmp(val,conditionVal) && (compOp == NO_OP || compOp == GE_OP || compOp == GE_OP || compOp == EQ_OP)) continue;
+                        }
+                        free(condition);
+                        //if satisfy, get output attributes, return 0
+                        std::vector<int> output;
+                        for(int p = 0;p < attributeNames.size();p++){
+                            for(int q = 0;q < recordDescriptor.size();q++){
+                                if(recordDescriptor[q].name == attributeNames[p]) output.push_back(q);
+                            }
+                        }
+                        int nullIndicatorSize = ceil(output.size() / 8.0);
+                        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+                        char nullfield = 0;
+                        int dataOffset = nullIndicatorSize;
+                        for(int p = 0;p < output.size();p++){
+                            char* outputData = (char*)malloc(PAGE_SIZE);
+                            std::string outputAttribute = attributeNames[p];
+                            AttrType type = recordDescriptor.at(output[p]).type;
+                            rbfm.readAttribute(*fileHandle,recordDescriptor, rid, outputAttribute,outputData);
+                            char null;
+                            memcpy(&null, outputData, sizeof(char));
+                            if(null != -1){
+                                nullfield += 1 << (7 - p % 8);
+                                if(type == TypeInt){
+                                    memcpy((char*)data + dataOffset, outputData, sizeof(int));
+                                    dataOffset += sizeof(int);
+                                }else if(type == TypeReal){
+                                    memcpy((char*)data + dataOffset, outputData, sizeof(float ));
+                                    dataOffset += sizeof(float );
+                                }else if(type == TypeVarChar){
+                                    int strLen;
+                                    memcpy(&strLen, outputData, sizeof(int));
+                                    memcpy((char*)data + dataOffset, outputData, sizeof(int) + strLen);
+                                    dataOffset += sizeof(int) + strLen;
+                                }
+                            }nullIndicator[p/8] = nullfield;
+                            free(outputData);
+                        }memcpy(data, nullIndicator, nullIndicatorSize);
+                        curPage = i;curSlot = j;
+                        rid.pageNum = i; rid.slotNum = j;
+                        free(page);
+                        free(nullIndicator);
+                        return 0;
+                    }
+                }
+            }
+            free(page);
+        }return RBFM_EOF;
     }
 
     void RecordBasedFileManager::getFieldInfo(const std::vector<Attribute> &recordDescriptor, const void *data,
