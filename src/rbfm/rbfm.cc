@@ -40,7 +40,7 @@ namespace PeterDB {
                                             const void *data, RID &rid) {
         //Change format of record
         short recordSize = 0;
-        char *record;
+        char* record=(char *) malloc(PAGE_SIZE);//allocate and free in the same function, check if null
         getFieldInfo(recordDescriptor, data, record, recordSize);
         int numOfPages = fileHandle.getNumberOfPages();
         if (numOfPages > 0) {
@@ -59,7 +59,7 @@ namespace PeterDB {
                         //std::cerr << "Can not insert record in page:" << i << std::endl;
 #endif
                     } else {
-                        free(record);
+                        if(record!= nullptr) free(record);
                         return 0;
                     }
                 }
@@ -70,14 +70,14 @@ namespace PeterDB {
 #ifdef DEBUG
                     //std::cerr << "Can not insert record in new page:" << std::endl;
 #endif
-                    free(record);
+                    if(record!= nullptr) free(record);
                     return -1;
                 } else {
-                    free(record);
+                    if(record!= nullptr) free(record);
                     return 0;
                 }
             } else {
-                free(record);
+                if(record!= nullptr) free(record);
                 return 0;
             }
         } else {
@@ -87,10 +87,10 @@ namespace PeterDB {
 #ifdef DEBUG
                 //std::cerr << "Can not insert record in new page:" << std::endl;
 #endif
-                free(record);
+                if(record!= nullptr) free(record);
                 return -1;
             } else {
-                free(record);
+                if(record!= nullptr) free(record);
                 return 0;
             }
         }
@@ -118,10 +118,10 @@ namespace PeterDB {
 #ifdef DEBUG
                 std::cerr << "Cannot read real record when reading record." << std::endl;
 #endif
-                free(page);
+                if(page!= nullptr) free(page);
                 return -1;
             }
-            free(page);
+            if(page!= nullptr) free(page);
             return status;
         }else{
             //offset: pointer in the page
@@ -182,8 +182,8 @@ namespace PeterDB {
                 }
             }
             //std::cout << "readRecord complete page:"<<pageNum<<" slot:"<<slotNum<< std::endl;
-            free(page);
-            free(nullIndicator);
+            if(page!= nullptr) free(page);
+            if(nullIndicator!= nullptr) free(nullIndicator);
             return 0;
         }
     }
@@ -210,7 +210,7 @@ namespace PeterDB {
 #ifdef DEBUG
                 std::cerr << "Cannot delete real record when deleting record." << std::endl;
 #endif
-                free(page);
+                if(page!= nullptr) free(page);
                 return -1;
             }
         }
@@ -237,10 +237,10 @@ namespace PeterDB {
 #ifdef DEBUG
             std::cerr << "Can not write page back when deleting record." << std::endl;
 #endif
-            free(page);
+            if(page!= nullptr) free(page);
             return -1;
         }
-        free(page);
+        if(page!= nullptr) free(page);
         std::cout<<"delete page:"<<pageNum<<" slot:"<<slotNum<<" complete"<<std::endl;
         return 0;
     }
@@ -314,7 +314,7 @@ namespace PeterDB {
                     out << str;
                     //std::cout << str;
                     offset += strLen;
-                    free(str);
+                    if(str!= nullptr) free(str);
                 }
             } else {
                 out << "NULL";
@@ -327,14 +327,14 @@ namespace PeterDB {
         }
         out << std::endl;
         //std::cout << std::endl;
-        free(nullIndicator);
+        if(nullIndicator!= nullptr) free(nullIndicator);
         return 0;
     }
 
     RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                             const void *data, const RID &rid) {
         short newRecordLen = 0;
-        char *newRecord;
+        char *newRecord = (char*)malloc(PAGE_SIZE);
         getFieldInfo(recordDescriptor, data, newRecord, newRecordLen);
         int pageNum = rid.pageNum;short slotNum = rid.slotNum;
         char *page = (char *) malloc(PAGE_SIZE);
@@ -358,7 +358,7 @@ namespace PeterDB {
 #ifdef DEBUG
                 std::cerr << "Cannot update real record when updating record." << std::endl;
 #endif
-                free(page);
+                if(page!= nullptr) free(page);
                 return -1;
             }
         }
@@ -399,6 +399,8 @@ namespace PeterDB {
             }
         }
         fileHandle.writePage(pageNum, page);
+        if(page!= nullptr) free(page);
+        if(newRecord!= nullptr) free(newRecord);
         return 0;
     }
 
@@ -410,7 +412,7 @@ namespace PeterDB {
 #ifdef DEBUG
             std::cerr << "Cannot read record when reading attribute." << std::endl;
 #endif
-            free(record);
+            if(record!= nullptr) free(record);
             return -1;
         }
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
@@ -452,8 +454,8 @@ namespace PeterDB {
                 }
             }
         }
-        free(nullIndicator);
-        free(record);
+        if(nullIndicator != nullptr) free(nullIndicator);
+        if(record != nullptr) free(record);
         return 0;
     }
 
@@ -530,7 +532,7 @@ namespace PeterDB {
                             if(strcmp(val,conditionVal) && (compOp == NO_OP || compOp == LT_OP || compOp == GT_OP)) continue;
                             if(strcmp(val,conditionVal) && (compOp == NO_OP || compOp == GE_OP || compOp == GE_OP || compOp == EQ_OP)) continue;
                         }
-                        free(condition);
+                        if(condition!= nullptr) free(condition);
                         //if satisfy, get output attributes, return 0
                         std::vector<int> output;
                         for(int p = 0;p < attributeNames.size();p++){
@@ -564,17 +566,17 @@ namespace PeterDB {
                                     dataOffset += sizeof(int) + strLen;
                                 }
                             }nullIndicator[p/8] = nullfield;
-                            free(outputData);
+                            if(outputData!= nullptr) free(outputData);
                         }memcpy(data, nullIndicator, nullIndicatorSize);
                         curPage = i;curSlot = j;
                         rid.pageNum = i; rid.slotNum = j;
-                        free(page);
-                        free(nullIndicator);
+                        if(page!= nullptr) free(page);
+                        if(nullIndicator!= nullptr) free(nullIndicator);
                         return 0;
                     }
                 }
             }
-            free(page);
+            if(page!= nullptr) free(page);
         }return RBFM_EOF;
     }
 
@@ -624,7 +626,7 @@ namespace PeterDB {
                 }
             }
         }
-        record = (char *) malloc(recordSize);
+        //record = (char *) malloc(recordSize);
         //Assign fieldsNum
         memcpy(record + offset, &fieldsNum, sizeof(short));
         offset += sizeof(short);
@@ -660,7 +662,7 @@ namespace PeterDB {
                 //std::cout << "field offset:" << fieldOffset << std::endl;
             }
         }
-        free(nullIndicator);
+        if(nullIndicator!= nullptr) free(nullIndicator);
     }
 
     int getSlotTable(char *page, int count, int size);
@@ -676,7 +678,7 @@ namespace PeterDB {
 #ifdef DEBUG
             //std::cerr << "Can not get slot table when insert record in a new page" << std::endl;
 #endif
-            free(newPage);
+            if(newPage!= nullptr) free(newPage);
             return -1;
         } else {
             short offset = 0;
@@ -686,13 +688,13 @@ namespace PeterDB {
 #ifdef DEBUG
                 //std::cerr << "Can not append a page while insert a record" << std::endl;
 #endif
-                free(newPage);
+                if(newPage!= nullptr) free(newPage);
                 return -1;
             }
             int totalPage = fileHandle.getNumberOfPages();
             rid.pageNum = totalPage - 1;
             rid.slotNum = 0;
-            free(newPage);
+            if(newPage!= nullptr) free(newPage);
             return 0;
         }
     }
@@ -792,7 +794,7 @@ namespace PeterDB {
 #ifdef DEBUG
             //std::cerr << "Can not read page " << pageNum << " while insert record in old page" << std::endl;
 #endif
-            free(oldPage);
+            if(oldPage!= nullptr) free(oldPage);
             return -1;
         }
         short freeSpace;
@@ -827,12 +829,12 @@ namespace PeterDB {
 #ifdef DEBUG
                 std::cerr << "Can not write page " << pageNum << std::endl;
 #endif
-                free(oldPage);
+                if(oldPage!= nullptr) free(oldPage);
                 return -1;
             }
             rid.pageNum = pageNum;
             rid.slotNum = targetSlot;
-            free(oldPage);
+            if(oldPage!= nullptr) free(oldPage);
             return 0;
         }
         return -1;

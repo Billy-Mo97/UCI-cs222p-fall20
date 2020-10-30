@@ -139,7 +139,7 @@ namespace PeterDB {
         //Initiate the file pointer of FileHandle instance.
         if (pointer != NULL) { return -1; }
         else {
-            pointer = fopen(fileName.c_str(), "r+b");//original: r+b
+            pointer = fopen(fileName.c_str(), "r+");//original: r+b
             if (pointer == NULL) { return -1; }
             else {
                 //Read the readPageCounter, writePageCounter, appendPageCounter and page number
