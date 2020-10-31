@@ -2,6 +2,7 @@
 #include "iostream"
 #include "string.h"
 #include "math.h"
+
 namespace PeterDB {
     RecordBasedFileManager &RecordBasedFileManager::instance() {
         static RecordBasedFileManager _rbf_manager = RecordBasedFileManager();
@@ -98,23 +99,24 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                           const RID &rid, void *data) {
-        int pageNum = rid.pageNum;short slotNum = rid.slotNum;
+        int pageNum = rid.pageNum;
+        short slotNum = rid.slotNum;
         char *page = (char *) malloc(PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, page);
         short offset, recordLen;
         memcpy(&offset, page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 2) - sizeof(short), sizeof(short));
         memcpy(&recordLen, page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), sizeof(short));
         //already deleted
-        if(offset == -1){return -1;}
+        if (offset == -1) { return -1; }
         char flag;
         memcpy(&flag, page + offset, sizeof(char));
         //if is tombstone
-        if(flag == -1){
+        if (flag == -1) {
             RID finalRid;
             memcpy(&finalRid.pageNum, page + offset + sizeof(char), sizeof(int));
             memcpy(&finalRid.slotNum, page + offset + sizeof(char) + sizeof(int), sizeof(short));
             status = readRecord(fileHandle, recordDescriptor, finalRid, data);
-            if (status == -1){
+            if (status == -1) {
 #ifdef DEBUG
                 std::cerr << "Cannot read real record when reading record." << std::endl;
 #endif
@@ -123,12 +125,13 @@ namespace PeterDB {
             }
             free(page);
             return status;
-        }else{
+        } else {
             //offset: pointer in the page
             //dataOffset: pointer to iterate through data
             //std::cout << "readRecord page:"<<pageNum<<" slot:"<<slotNum<< std::endl;
             short fieldStart = offset;
-            int nullBit = 0; short dataOffset = 0;
+            int nullBit = 0;
+            short dataOffset = 0;
             int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
             char *nullIndicator = (char *) malloc(nullIndicatorSize);
             //Skip num of fields, get null indicator
@@ -165,10 +168,10 @@ namespace PeterDB {
                     } else if (type == TypeVarChar) {
                         short prevEnd, curEnd;
                         int strLen;
-                        if (fieldOffset == fieldStart) { prevEnd = sizeof(short) + nullIndicatorSize +
-                                                                                        sizeof(short) * nonNull;
-                        }
-                        else { memcpy(&prevEnd, (char *) page + fieldOffset - sizeof(short), sizeof(short)); }
+                        if (fieldOffset == fieldStart) {
+                            prevEnd = sizeof(short) + nullIndicatorSize +
+                                      sizeof(short) * nonNull;
+                        } else { memcpy(&prevEnd, (char *) page + fieldOffset - sizeof(short), sizeof(short)); }
                         memcpy(&curEnd, (char *) page + fieldOffset, sizeof(short));
                         strLen = curEnd - prevEnd;
                         memcpy((char *) data + dataOffset, &strLen, sizeof(int));
@@ -191,22 +194,23 @@ namespace PeterDB {
     RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                             const RID &rid) {
         char *page = (char *) malloc(PAGE_SIZE);
-        int pageNum = rid.pageNum;short slotNum = rid.slotNum;
+        int pageNum = rid.pageNum;
+        short slotNum = rid.slotNum;
         RC status = fileHandle.readPage(pageNum, page);
         short offset, size;
         memcpy(&offset, page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 2) - sizeof(short), sizeof(short));
         memcpy(&size, page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), sizeof(short));
         //already deleted
-        if(offset == -1){return -1;}
+        if (offset == -1) { return -1; }
         char flag;
         memcpy(&flag, page + offset, sizeof(char));
         //if is tombstone
-        if(flag ==-1){
+        if (flag == -1) {
             RID finalRid;
             memcpy(&finalRid.pageNum, page + offset + sizeof(char), sizeof(int));
             memcpy(&finalRid.slotNum, page + offset + sizeof(char) + sizeof(int), sizeof(short));
             status = deleteRecord(fileHandle, recordDescriptor, finalRid);
-            if (status == -1){
+            if (status == -1) {
 #ifdef DEBUG
                 std::cerr << "Cannot delete real record when deleting record." << std::endl;
 #endif
@@ -219,21 +223,21 @@ namespace PeterDB {
         memcpy(&slotCount, page + PAGE_SIZE - sizeof(short) * 2, sizeof(short));
         //remove all deleted directories in the back
         short deletedCount = 0;
-        for(short i = slotCount - 1; i >= 0; i--){
+        for (short i = slotCount - 1; i >= 0; i--) {
             short ithOffset;
             memcpy(&ithOffset, page + PAGE_SIZE - sizeof(short) * (i * 2 + 2) - sizeof(short), sizeof(short));
-            if(ithOffset == -1){deletedCount++;}
+            if (ithOffset == -1) { deletedCount++; }
         }
         slotCount -= deletedCount;
         freeSpace += size + deletedCount * sizeof(short) * 2;
         memcpy(page + PAGE_SIZE - sizeof(short) * 2, &slotCount, sizeof(short));
         memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
         //if deleted slot is not in the back
-        if(slotNum < slotCount - 1){shiftSlots(offset, slotNum + 1, slotCount, page);}
+        if (slotNum < slotCount - 1) { shiftSlots(offset, slotNum + 1, slotCount, page); }
         int deleteFlag = -1;
         memcpy(page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 3), &deleteFlag, sizeof(short));
         status = fileHandle.writePage(pageNum, page);
-        if (status == -1){
+        if (status == -1) {
 #ifdef DEBUG
             std::cerr << "Can not write page back when deleting record." << std::endl;
 #endif
@@ -241,7 +245,7 @@ namespace PeterDB {
             return -1;
         }
         free(page);
-        std::cout<<"delete page:"<<pageNum<<" slot:"<<slotNum<<" complete"<<std::endl;
+        std::cout << "delete page:" << pageNum << " slot:" << slotNum << " complete" << std::endl;
         return 0;
     }
 
@@ -249,23 +253,26 @@ namespace PeterDB {
         //find first undeleted slot in [begin, end)
         bool flag = false;
         short beginOffset, endOffset, endSlotSize;
-        for(short i = begin; i < end; i++){
+        for (short i = begin; i < end; i++) {
             memcpy(&beginOffset, page + PAGE_SIZE - sizeof(short) * (4 + i * 2) + sizeof(short), sizeof(short));
-            if(beginOffset != -1){flag = true; break;}
+            if (beginOffset != -1) {
+                flag = true;
+                break;
+            }
         }
-        if(!flag){return;}
-        for(short i = end - 1; i >= begin; i--){
+        if (!flag) { return; }
+        for (short i = end - 1; i >= begin; i--) {
             memcpy(&endOffset, page + PAGE_SIZE - sizeof(short) * (4 + i * 2) + sizeof(short), sizeof(short));
             memcpy(&endSlotSize, page + PAGE_SIZE - sizeof(short) * (4 + i * 2), sizeof(short));
-            if(endOffset != -1){break;}
+            if (endOffset != -1) { break; }
         }
         short shiftLength = endOffset + endSlotSize - beginOffset;
         memmove(page + targetOffset, page + beginOffset, shiftLength);
         short changeOffset = targetOffset - beginOffset;
-        for(short i = begin; i < end; i++){
+        for (short i = begin; i < end; i++) {
             short tmp;
             memcpy(&tmp, page + PAGE_SIZE - sizeof(short) * (4 + i * 2) + sizeof(short), sizeof(short));
-            if(tmp != -1){
+            if (tmp != -1) {
                 tmp += changeOffset;
                 memcpy(page + PAGE_SIZE - sizeof(short) * (4 + i * 2) + sizeof(short), &tmp, sizeof(short));
             }
@@ -336,25 +343,26 @@ namespace PeterDB {
         short newRecordLen = 0;
         char *newRecord;
         getFieldInfo(recordDescriptor, data, newRecord, newRecordLen);
-        int pageNum = rid.pageNum;short slotNum = rid.slotNum;
+        int pageNum = rid.pageNum;
+        short slotNum = rid.slotNum;
         char *page = (char *) malloc(PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, page);
         short slotCount;
-        memcpy(&slotCount, page + PAGE_SIZE -2 * sizeof(short), sizeof(short));
+        memcpy(&slotCount, page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
         short offset, recordLen;
         memcpy(&offset, page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 2) - sizeof(short), sizeof(short));
         memcpy(&recordLen, page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), sizeof(short));
         //already deleted
-        if(offset == -1){return -1;}
+        if (offset == -1) { return -1; }
         char flag;
         memcpy(&flag, page + offset, sizeof(char));
         //if is tombstone
-        if(flag == -1){
+        if (flag == -1) {
             RID finalRid;
             memcpy(&finalRid.pageNum, page + offset + sizeof(char), sizeof(int));
             memcpy(&finalRid.slotNum, page + offset + sizeof(char) + sizeof(int), sizeof(short));
             status = updateRecord(fileHandle, recordDescriptor, data, finalRid);
-            if (status == -1){
+            if (status == -1) {
 #ifdef DEBUG
                 std::cerr << "Cannot update real record when updating record." << std::endl;
 #endif
@@ -362,9 +370,9 @@ namespace PeterDB {
                 return -1;
             }
         }
-        if(recordLen == newRecordLen){
+        if (recordLen == newRecordLen) {
             memcpy(page + offset, newRecord, recordLen);
-        }else if(recordLen > newRecordLen){
+        } else if (recordLen > newRecordLen) {
             memcpy(page + offset, newRecord, newRecordLen);
             short freeSpace;
             memcpy(&freeSpace, page + PAGE_SIZE - sizeof(short), sizeof(short));
@@ -372,25 +380,27 @@ namespace PeterDB {
             freeSpace += newRecordLen - recordLen;
             memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
             //update record len in directory
-            memcpy( page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), &newRecordLen, sizeof(short));
-        }else{
+            memcpy(page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), &newRecordLen, sizeof(short));
+        } else {
             short freeSpace;
             memcpy(&freeSpace, page + PAGE_SIZE - sizeof(short), sizeof(short));
-            if(freeSpace >= newRecordLen - recordLen){
+            if (freeSpace >= newRecordLen - recordLen) {
                 shiftSlots(offset + newRecordLen, slotNum + 1, slotCount, page);
-                freeSpace -= newRecordLen -recordLen;
+                freeSpace -= newRecordLen - recordLen;
                 memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
-                memcpy( page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), &newRecordLen, sizeof(short));
+                memcpy(page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), &newRecordLen, sizeof(short));
                 memcpy(page + offset, newRecord, newRecordLen);
-            }else{//not enough space, use tombstone
+            } else {//not enough space, use tombstone
                 RID newRid;
                 insertRecord(fileHandle, recordDescriptor, data, newRid);
                 short tombstoneLen = 7;//flag+pageNum+slotNum
                 shiftSlots(offset + tombstoneLen, slotNum + 1, slotCount, page);
                 freeSpace += recordLen - tombstoneLen;
                 memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
-                memcpy( page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), &tombstoneLen, sizeof(short));
-                char flag = -1;int newPageNum = newRid.pageNum; short newSlotNum = newRid.slotNum;
+                memcpy(page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4), &tombstoneLen, sizeof(short));
+                char flag = -1;
+                int newPageNum = newRid.pageNum;
+                short newSlotNum = newRid.slotNum;
                 memcpy(page + offset, &flag, sizeof(char));
                 offset += sizeof(char);
                 memcpy(page + offset, &newPageNum, sizeof(int));
@@ -590,53 +600,59 @@ namespace PeterDB {
         memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
         //memcpy(page + PAGE_SIZE - sizeof(int) * 2, &newSlotCount, sizeof(int));
         if (slotCount == 0) {
-            short offset = 0,newFreeSpace = freeSpace - 4 * sizeof(short);
+            short offset = 0, newFreeSpace = freeSpace - 4 * sizeof(short);
             memcpy(page + PAGE_SIZE - sizeof(short), &newFreeSpace, sizeof(short));
             memcpy(page + PAGE_SIZE - sizeof(short) * 3, &offset, sizeof(short));
             memcpy(page + PAGE_SIZE - sizeof(short) * 4, &slotSize, sizeof(short));
             memcpy(page + PAGE_SIZE - sizeof(short) * 2, &newSlotCount, sizeof(short));
         } else {
             //find whether there is a deleted slot
-            for(short i = 0; i < slotCount; i++){
+            for (short i = 0; i < slotCount; i++) {
                 short slotOffset = 0;
-                memcpy(&slotOffset,page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), sizeof(short));
-                if(slotOffset == -1){
+                memcpy(&slotOffset, page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), sizeof(short));
+                if (slotOffset == -1) {
                     //if it is not the last slot
-                    if(i < slotCount-1){
+                    if (i < slotCount - 1) {
                         //find the next undeleted slotOffset to put it in the deleted slot
                         bool flag = false;
-                        for(short j = i + 1; j < slotCount; j++){
+                        for (short j = i + 1; j < slotCount; j++) {
                             short nextSlotOffset = 0;
-                            memcpy(&nextSlotOffset,page + PAGE_SIZE - sizeof(short) * (2 * j + 4) + sizeof(short), sizeof(short));
-                            if(nextSlotOffset != -1){
-                                memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), &nextSlotOffset, sizeof(short));
+                            memcpy(&nextSlotOffset, page + PAGE_SIZE - sizeof(short) * (2 * j + 4) + sizeof(short),
+                                   sizeof(short));
+                            if (nextSlotOffset != -1) {
+                                memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), &nextSlotOffset,
+                                       sizeof(short));
                                 flag = true;
                                 break;
                             }
                         }
-                        if(!flag){
+                        if (!flag) {
                             //if there is no undeleted slot, check whether this is the first slot
-                            if(i == 0){
+                            if (i == 0) {
                                 short offset = 0;
                                 memcpy(page + PAGE_SIZE - sizeof(short) * 3, &offset, sizeof(short));
                                 memcpy(page + PAGE_SIZE - sizeof(short) * 4, &slotSize, sizeof(short));
-                            }else{
+                            } else {
                                 short previousOffset;
-                                memcpy(&previousOffset, page + PAGE_SIZE - sizeof(short) * (2 * i + 2) + sizeof(short), sizeof(short));
+                                memcpy(&previousOffset, page + PAGE_SIZE - sizeof(short) * (2 * i + 2) + sizeof(short),
+                                       sizeof(short));
                                 short previousSize;
                                 memcpy(&previousSize, page + PAGE_SIZE - sizeof(short) * (2 * i + 2), sizeof(short));
                                 short newOffset = previousOffset + previousSize;
-                                memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), &newOffset, sizeof(short));
+                                memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), &newOffset,
+                                       sizeof(short));
                                 memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4), &slotSize, sizeof(short));
                             }
                         }
-                    }else{
+                    } else {
                         short previousOffset;
-                        memcpy(&previousOffset, page + PAGE_SIZE - sizeof(short) * (2 * i + 2) + sizeof(short), sizeof(short));
+                        memcpy(&previousOffset, page + PAGE_SIZE - sizeof(short) * (2 * i + 2) + sizeof(short),
+                               sizeof(short));
                         short previousSize;
                         memcpy(&previousSize, page + PAGE_SIZE - sizeof(short) * (2 * i + 2), sizeof(short));
                         short newOffset = previousOffset + previousSize;
-                        memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), &newOffset, sizeof(short));
+                        memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4) + sizeof(short), &newOffset,
+                               sizeof(short));
                         memcpy(page + PAGE_SIZE - sizeof(short) * (2 * i + 4), &slotSize, sizeof(short));
                     }
                     //std::cout<<"use deleted slot,slotCount:"<<slotCount<<" free:"<<freeSpace<<std::endl;
@@ -644,12 +660,14 @@ namespace PeterDB {
                 }
             }// did not find deleted slot, then put in the back
             short previousOffset;
-            memcpy(&previousOffset, page + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2) + sizeof(short), sizeof(short));
+            memcpy(&previousOffset, page + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2) + sizeof(short),
+                   sizeof(short));
             short previousSize;
             memcpy(&previousSize, page + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2), sizeof(short));
             short newOffset = previousOffset + previousSize;
             memcpy(page + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2) - sizeof(short), &newOffset, sizeof(short));
-            memcpy(page + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2) - sizeof(short) * 2, &slotSize, sizeof(short));
+            memcpy(page + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2) - sizeof(short) * 2, &slotSize,
+                   sizeof(short));
             memcpy(page + PAGE_SIZE - sizeof(short) * 2, &newSlotCount, sizeof(short));
             freeSpace -= 2 * sizeof(short);//new directory
             memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
@@ -687,14 +705,18 @@ namespace PeterDB {
             memcpy(&newSlotCount, oldPage + PAGE_SIZE - sizeof(short) * 2, sizeof(short));
             //std::cout<<"newSlotCount:"<<newSlotCount<<std::endl;
             //if use deleted slot
-            if(slotCount == newSlotCount){
+            if (slotCount == newSlotCount) {
                 short targetOffset;
-                memcpy(&targetOffset, oldPage + PAGE_SIZE - sizeof(short) * (2 * targetSlot + 4) + sizeof(short), sizeof(short));
-                if(targetSlot < slotCount - 1){shiftSlots(targetOffset + slotSize, targetSlot + 1, slotCount, oldPage);}
+                memcpy(&targetOffset, oldPage + PAGE_SIZE - sizeof(short) * (2 * targetSlot + 4) + sizeof(short),
+                       sizeof(short));
+                if (targetSlot < slotCount - 1) {
+                    shiftSlots(targetOffset + slotSize, targetSlot + 1, slotCount, oldPage);
+                }
                 memcpy(oldPage + targetOffset, record, recordSize);
-            }else{
+            } else {
                 short lastOffset;
-                memcpy(&lastOffset, oldPage + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2) + sizeof(short), sizeof(short));
+                memcpy(&lastOffset, oldPage + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2) + sizeof(short),
+                       sizeof(short));
                 short lastLength;
                 memcpy(&lastLength, oldPage + PAGE_SIZE - sizeof(short) * (2 * slotCount + 2), sizeof(short));
                 short offset = lastOffset + lastLength;
