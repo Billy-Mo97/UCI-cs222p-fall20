@@ -16,6 +16,8 @@ namespace PeterDB {
     // RM_ScanIterator is an iterator to go through tuples
     class RM_ScanIterator {
     public:
+        RBFM_ScanIterator rbfm_ScanIterator;
+
         RM_ScanIterator();
 
         ~RM_ScanIterator();
@@ -40,6 +42,8 @@ namespace PeterDB {
 
         void prepareColumnData(int tableId, std::string columnName, AttrType columnType, int columnLength,
                                int columnPosition, TableFlagType tableFlag, std::vector<Attribute> &columnAttributeDescriptor, void *columnData);
+
+        RC checkCatalog();
 
         RC createCatalog();
 

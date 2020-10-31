@@ -68,9 +68,30 @@ namespace PeterDB {
         // "data" follows the same format as RecordBasedFileManager::insertRecord().
         RC getNextRecord(RID &rid, void *data);
 
-        RC close() { return -1; }
+        RC close() {
+            fileHandle = NULL;
+            recordDescriptor.clear();
+            conditionPos = 0;
+            compOp = NO_OP;
+            value = NULL;
+            attributeNames.clear();
+            conditionAttribute = "";
+            curPage = 0;
+            maxPage = 0;
+            curSlot = 0;
+            return 0;
+        }
+
         int curPage, maxPage;
         short curSlot;
+        FileHandle *fileHandle = NULL;
+        std::vector<Attribute> recordDescriptor;
+        int conditionPos = 0;
+        CompOp compOp = NO_OP;
+        void *value = NULL;
+        std::vector<std::string> attributeNames;
+        std::string conditionAttribute = "";
+
         void setFileHandle(FileHandle &fileHandle) {
             RBFM_ScanIterator::fileHandle = &fileHandle;
         }
@@ -89,35 +110,30 @@ namespace PeterDB {
 
         void setValue(const void *value) {
             AttrType conditionType = RBFM_ScanIterator::recordDescriptor.at(RBFM_ScanIterator::conditionPos).type;
-            if(conditionType == TypeInt){
+            if (conditionType == TypeInt) {
                 RBFM_ScanIterator::value = malloc(sizeof(int));
                 memcpy(RBFM_ScanIterator::value, value, sizeof(int));
-            }else if(conditionType == TypeReal){
+            } else if (conditionType == TypeReal) {
                 RBFM_ScanIterator::value = malloc(sizeof(float));
                 memcpy(RBFM_ScanIterator::value, value, sizeof(float));
-            }else if(conditionType == TypeVarChar){
+            } else if (conditionType == TypeVarChar) {
                 int strLength;
                 memcpy(&strLength, value, sizeof(int));
                 RBFM_ScanIterator::value = malloc(sizeof(int) + strLength);
                 memcpy(RBFM_ScanIterator::value, value, sizeof(int));
-                memcpy((char*)RBFM_ScanIterator::value + sizeof(int), (char*)value + sizeof(int), strLength);
+                memcpy((char *) RBFM_ScanIterator::value + sizeof(int), (char *) value + sizeof(int), strLength);
             }
         }
 
         void setAttributeNames(const std::vector<std::string> &attributeNames) {
             RBFM_ScanIterator::attributeNames = attributeNames;
         };
+
         void setConditionAttribute(const std::string conditionName) {
             RBFM_ScanIterator::conditionAttribute = conditionName;
         };
-    private:
-        FileHandle* fileHandle;
-        std::vector<Attribute> recordDescriptor;
-        int conditionPos;
-        CompOp compOp;
-        void *value;
-        std::vector<std::string> attributeNames;
-        std::string conditionAttribute;
+
+
     };
 
     class RecordBasedFileManager {
@@ -192,7 +208,7 @@ namespace PeterDB {
         ~RecordBasedFileManager();                                                  // Prevent unwanted destruction
         RecordBasedFileManager(const RecordBasedFileManager &);                     // Prevent construction by copying
         RecordBasedFileManager &operator=(const RecordBasedFileManager &);          // Prevent assignment
-        PagedFileManager* pagedFileManager;
+        PagedFileManager *pagedFileManager;
 
 
         void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, char *&record, short &size);

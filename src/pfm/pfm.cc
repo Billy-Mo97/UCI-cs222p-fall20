@@ -21,8 +21,8 @@ namespace PeterDB {
     RC PagedFileManager::createFile(const std::string &fileName) {
         //If the file has existed.
         FILE *file;
-        if ((file=fopen(fileName.c_str(), "r"))!= NULL) {
-            fclose(file);
+        struct stat buffer;
+        if ((stat(fileName.c_str(), &buffer) == 0)) {
             return -1;
         } else {
             file = fopen(fileName.c_str(), "w+b");//original: w+b
@@ -90,12 +90,13 @@ namespace PeterDB {
 
     RC FileHandle::readPage(PageNum pageNum, void *data) {
         if (pageNum < 0 || pageNum > numOfPages) {
-            return -1; }
+            return -1;
+        }
         fseek(pointer, (pageNum + 1) * PAGE_SIZE, SEEK_SET);
         int result = fread(data, 1, PAGE_SIZE, pointer);
         if (result != PAGE_SIZE) {
-            return -1; }
-        else {
+            return -1;
+        } else {
             readPageCounter++;
             return 0;
         }
@@ -168,7 +169,10 @@ namespace PeterDB {
         fwrite(&appendPageCounter, sizeof(unsigned), 1, pointer);
         fwrite(&numOfPages, sizeof(unsigned), 1, pointer);
         fflush(pointer);
-        if (fclose(pointer) == 0) { return 0; }
+        if (fclose(pointer) == 0) {
+            pointer = NULL;
+            return 0;
+        }
         else { return -1; }
     }
 

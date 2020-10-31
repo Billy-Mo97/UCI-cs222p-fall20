@@ -1,5 +1,6 @@
 #include "src/include/rm.h"
 #include <map>
+#include <iostream>
 
 namespace PeterDB {
     RelationManager &RelationManager::instance() {
@@ -140,11 +141,23 @@ namespace PeterDB {
         return;
     }
 
+    RC RelationManager::checkCatalog() {
+        //Check whether catalog files exists.
+        PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
+        PeterDB::FileHandle fileHandle;
+        if(rbfm.openFile("Tables", fileHandle) == -1) { return -1; }
+        if(rbfm.closeFile(fileHandle) == -1) { return -1; }
+        if(rbfm.openFile("Columns", fileHandle) == -1) { return -1; }
+        if(rbfm.closeFile(fileHandle) == -1) { return -1; }
+        return 0;
+    }
+
     RC RelationManager::createCatalog() {
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         //Create "Tables"
+        //std::cout << "Creating catalog:\n";
         if(rbfm.createFile("Tables") == -1) { return -1; }
-
+        //std::cout << "Create \"Tables\" succeed\n";
         //Prepare a tuple of "Tables", insert it into "Tables" table.
         void *tableData = NULL;
         std::vector<Attribute> tableAttributeDescriptor;
@@ -155,27 +168,34 @@ namespace PeterDB {
                          tableAttributeDescriptor, tableData);
         PeterDB::FileHandle fileHandle;
         if(rbfm.openFile("Tables", fileHandle) == -1) { return -1; }
+        //std::cout << "Open \"Tables\" succeed\n";
         RID rid;
         if(rbfm.insertRecord(fileHandle, tableAttributeDescriptor, tableData, rid) == -1) { return -1; }
+        //std::cout << "Insert first record into \"Tables\" succeed\n";
         free(tableData);
         tableData = NULL;
         tableAttributeDescriptor.clear();
         if(rbfm.closeFile(fileHandle) == -1) { return -1; }
+        //std::cout << "Close \"Tables\" succeed\n";
 
         //Create "Columns"
         if(rbfm.createFile("Columns") == -1) { return -1; }
-
+        //std::cout << "Create \"Columns\" succeed\n";
         //Prepare a tuple of "Columns", insert it into "Tables" table.
         tableData = malloc(tableDataSize);
         prepareTableData(2, "Columns", "Columns", System,
                          tableAttributeDescriptor, tableData);
+        //std::cout << "Preparing second record complete.\n";
         if(rbfm.openFile("Tables", fileHandle) == -1) { return -1; }
+        //std::cout << "Open \"Tables\" succeed\n";
         if(rbfm.insertRecord(fileHandle, tableAttributeDescriptor, tableData, rid) == -1) { return -1; }
+        //std::cout << "Insert second record into \"Tables\" succeed\n";
         if(rbfm.closeFile(fileHandle) == -1) { return -1; }
         free(tableData);
         tableData = NULL;
         //Prepare 4 tuples of "Tables", insert it into "Columns" table.
         if(rbfm.openFile("Columns", fileHandle) == -1) { return -1; }
+        //std::cout << "Open \"Columns\" succeed\n";
         void *table_ColumnData1 = NULL, *table_ColumnData2 = NULL, *table_ColumnData3 = NULL, *table_ColumnData4 = NULL;
         std::vector<Attribute> columnAttributeDescriptor;
         int columnDataSize;
@@ -192,10 +212,12 @@ namespace PeterDB {
                           3, System, columnAttributeDescriptor, table_ColumnData3);
         prepareColumnData(1, "table-flag", TypeInt, 4,
                           4, System, columnAttributeDescriptor, table_ColumnData4);
+        //std::cout << "Preparing 4 tuples of \"Tables\" complete\n";
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, table_ColumnData1, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, table_ColumnData2, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, table_ColumnData3, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, table_ColumnData4, rid) == -1) { return -1; }
+        //std::cout << "Insert 4 tuples of \"Tables\" succeed.\n";
         free(table_ColumnData1);
         free(table_ColumnData2);
         free(table_ColumnData3);
@@ -226,12 +248,14 @@ namespace PeterDB {
                           5, System, columnAttributeDescriptor, column_ColumnData5);
         prepareColumnData(2, "table-flag", TypeInt, 4,
                           6, System, columnAttributeDescriptor, column_ColumnData6);
+        //std::cout << "Preparing 6 tuples of \"Columns\" complete\n";
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, column_ColumnData1, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, column_ColumnData2, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, column_ColumnData3, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, column_ColumnData4, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, column_ColumnData5, rid) == -1) { return -1; }
         if(rbfm.insertRecord(fileHandle, columnAttributeDescriptor, column_ColumnData6, rid) == -1) { return -1; }
+        //std::cout << "Insert 6 tuples of \"Columns\" succeed.\n";
         if(rbfm.closeFile(fileHandle) == -1) { return -1; }
         free(column_ColumnData1);
         free(column_ColumnData2);
@@ -249,21 +273,29 @@ namespace PeterDB {
     }
 
     RC RelationManager::deleteCatalog() {
+        //Pre-check: check whether catalog tables exists.
+        //if(checkCatalog() == -1) { return -1; }
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
-        if(rbfm.destroyFile("Tables") == -1) { return -1; }
-        if(rbfm.destroyFile("Columns") == -1) { return -1; }
+        RC r1 = rbfm.destroyFile("Tables") == -1;
+        RC r2 = rbfm.destroyFile("Columns") == -1;
+        if(r1 == -1 || r2 == -1) { return -1; }
         return 0;
     }
 
     RC RelationManager::createTable(const std::string &tableName, const std::vector<Attribute> &attrs) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
 
         //First, scan the table to find the maximum id
         RM_ScanIterator rmsi;
         std::vector<std::string> tableIdAttr = {"table-id"};
+        std::cout << "Creating table: begin to scan.\n";
         if(scan("Tables", "table-id",
                 NO_OP, NULL, tableIdAttr, rmsi) == -1) { return -1; }
+        std::cout << "Creating table: scan complete.\n";
         int nullIndicatorSize = ceil(tableIdAttr.size() / 8.0);
         void *returnedData = malloc(nullIndicatorSize + sizeof(int));
         RID rid;
@@ -312,6 +344,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::deleteTable(const std::string &tableName) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         //First, open "Tables" table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
@@ -375,6 +410,22 @@ namespace PeterDB {
     }
 
     RC RelationManager::getTableInfo(const std::string &tableName, int &tableId, std::string &fileName) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
+        //If caller is trying to get table info of "Tables" or "Columns",
+        //directly return the info without going to catalog.
+        if(tableName == "Tables") {
+            tableId = 1;
+            fileName = "Tables";
+            return 0;
+        }
+        if(tableName == "Columns") {
+            tableId = 2;
+            fileName = "Columns";
+            return 0;
+        }
+
         //Open "Tables" catalogue to find the filename of the table to insert.
         std::vector<std::string> attributeNames = {"table-id", "file-name"};
         RM_ScanIterator rmsi;
@@ -404,6 +455,22 @@ namespace PeterDB {
     }
 
     RC RelationManager::getAttributes(const std::string &tableName, std::vector<Attribute> &attrs) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
+        //If caller is trying to get attributes of "Tables" or "Columns",
+        //directly return the info without going to catalog.
+        if(tableName == "Tables") {
+            int tableDataSize;
+            prepareTableAttribute(attrs, tableDataSize);
+            return 0;
+        }
+        if(tableName == "Columns") {
+            int columnDataSize;
+            prepareColumnAttribute(attrs, columnDataSize);
+            return 0;
+        }
+
         //This function fetch the attributes from Catalog.
         //First, get the tableId and fileName of the table.
         int tableId;
@@ -456,6 +523,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::insertTuple(const std::string &tableName, const void *data, RID &rid) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;
@@ -473,6 +543,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::deleteTuple(const std::string &tableName, const RID &rid) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;
@@ -490,6 +563,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::updateTuple(const std::string &tableName, const void *data, const RID &rid) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;
@@ -507,6 +583,9 @@ namespace PeterDB {
     }
 
     RC RelationManager::readTuple(const std::string &tableName, const RID &rid, void *data) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;
@@ -532,6 +611,9 @@ namespace PeterDB {
 
     RC RelationManager::readAttribute(const std::string &tableName, const RID &rid, const std::string &attributeName,
                                       void *data) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;
@@ -554,20 +636,26 @@ namespace PeterDB {
                              const void *value,
                              const std::vector<std::string> &attributeNames,
                              RM_ScanIterator &rm_ScanIterator) {
+        //Pre-check: check whether catalog tables exists.
+        if(checkCatalog() == -1) { return -1; }
+
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;
         if(getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
         std::vector<Attribute> recordDescriptor;
         if(getAttributes(tableName, recordDescriptor) == -1) { return -1; }
+        std::cout << "Scanning: get the tableId and fileName from catalog.\n";
 
         //Then, scan from the table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
         PeterDB::RBFM_ScanIterator rbfmScanIterator;
         if(rbfm.openFile(fileName, fileHandle) == -1) { return -1; }
+        std::cout << "Scanning: open the table file.\n";
         if(rbfm.scan(fileHandle, recordDescriptor, conditionAttribute, compOp,
                      value, attributeNames, rbfmScanIterator) == -1) { return -1; }
+        rm_ScanIterator.rbfm_ScanIterator = rbfmScanIterator;
         if(rbfm.closeFile(fileHandle) == -1) { return -1; }
         return 0;
     }
@@ -576,9 +664,16 @@ namespace PeterDB {
 
     RM_ScanIterator::~RM_ScanIterator() = default;
 
-    RC RM_ScanIterator::getNextTuple(RID &rid, void *data) { return RM_EOF; }
+    RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
+        return rbfm_ScanIterator.getNextRecord(rid, data);
+    }
 
-    RC RM_ScanIterator::close() { return -1; }
+    RC RM_ScanIterator::close() {
+        PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
+        if(rbfm_ScanIterator.close() == -1) { return -1; }
+        if(rbfm.closeFile(*rbfm_ScanIterator.fileHandle) == -1) { return -1; }
+        return 0;
+    }
 
     // Extra credit work
     RC RelationManager::dropAttribute(const std::string &tableName, const std::string &attributeName) {
