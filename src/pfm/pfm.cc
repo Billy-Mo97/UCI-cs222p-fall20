@@ -23,10 +23,12 @@ namespace PeterDB {
         FILE *file;
         struct stat buffer;
         if ((stat(fileName.c_str(), &buffer) == 0)) {
+            //printf("already exist\n");
             return -1;
         } else {
             file = fopen(fileName.c_str(), "w+b");//original: w+b
             if (file == NULL) {
+                printf("null case\n");
                 return -1;
             } else {
                 //If the file has been successfully created,

@@ -189,6 +189,12 @@ namespace PeterDBTesting {
         }
     }
 
+
+
+
+
+
+
     static void setAttrNull(void *src, ushort attrNum, bool isNull) {
         unsigned bytes = 0;
         unsigned pos = 0;

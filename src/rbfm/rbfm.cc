@@ -42,6 +42,7 @@ namespace PeterDB {
         //Change format of record
         short recordSize = 0;
         char *record = (char *) malloc(PAGE_SIZE);//allocate and free in the same function, check if null
+        memset(record,0,PAGE_SIZE);
         getFieldInfo(recordDescriptor, data, record, recordSize);
         int numOfPages = fileHandle.getNumberOfPages();
         if (numOfPages > 0) {
@@ -101,7 +102,7 @@ namespace PeterDB {
                                           const RID &rid, void *data) {
         int pageNum = rid.pageNum;
         short slotNum = rid.slotNum;
-        char *page = (char *) malloc(PAGE_SIZE);
+        char *page = (char *) malloc(PAGE_SIZE);memset(page,0,PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, page);
         short offset, recordLen;
         memcpy(&offset, page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 2) - sizeof(short), sizeof(short));
@@ -133,7 +134,7 @@ namespace PeterDB {
             int nullBit = 0;
             short dataOffset = 0;
             int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-            char *nullIndicator = (char *) malloc(nullIndicatorSize);
+            char *nullIndicator = (char *) malloc(nullIndicatorSize);memset(nullIndicator,0,nullIndicatorSize);
             //Skip num of fields, get null indicator
             offset += sizeof(short);
             memcpy(nullIndicator, (char *) page + offset, nullIndicatorSize);
@@ -193,7 +194,7 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                             const RID &rid) {
-        char *page = (char *) malloc(PAGE_SIZE);
+        char *page = (char *) malloc(PAGE_SIZE);memset(page,0,PAGE_SIZE);
         int pageNum = rid.pageNum;
         short slotNum = rid.slotNum;
         RC status = fileHandle.readPage(pageNum, page);
@@ -293,7 +294,7 @@ namespace PeterDB {
         //First, copy the null indicator from data into nullIndicator.
         int nullBit = 0, offset = 0;
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);memset(nullIndicator,0,nullIndicatorSize);
         memcpy(nullIndicator, (char *) data + offset, nullIndicatorSize);
         offset += nullIndicatorSize;
         //Then, follow recordDescriptor to iterate through the data.
@@ -347,11 +348,11 @@ namespace PeterDB {
     RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                             const void *data, const RID &rid) {
         short newRecordLen = 0;
-        char *newRecord = (char *) malloc(PAGE_SIZE);
+        char *newRecord = (char *) malloc(PAGE_SIZE);memset(newRecord,0,PAGE_SIZE);
         getFieldInfo(recordDescriptor, data, newRecord, newRecordLen);
         int pageNum = rid.pageNum;
         short slotNum = rid.slotNum;
-        char *page = (char *) malloc(PAGE_SIZE);
+        char *page = (char *) malloc(PAGE_SIZE);memset(page,0,PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, page);
         short slotCount;
         memcpy(&slotCount, page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
@@ -422,7 +423,7 @@ namespace PeterDB {
 
     RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
                                              const RID &rid, const std::string &attributeName, void *data) {
-        char *record = (char *) malloc(PAGE_SIZE);
+        char *record = (char *) malloc(PAGE_SIZE);memset(record,0,PAGE_SIZE);
         RC status = readRecord(fileHandle, recordDescriptor, rid, record);
         printRecord(recordDescriptor, record, std::cout);
         if (status == -1) {
@@ -433,7 +434,7 @@ namespace PeterDB {
             return -1;
         }
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);memset(nullIndicator,0,nullIndicatorSize);
         short offset = nullIndicatorSize;
         for (int i = 0; i < recordDescriptor.size(); i++) {
             int nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
@@ -519,7 +520,7 @@ namespace PeterDB {
         }
         for (int i = curPage; i <= maxPage; i++) {
             std::cout << "Getting next record: start.\n";
-            char *page = (char *) malloc(PAGE_SIZE);
+            char *page = (char *) malloc(PAGE_SIZE);memset(page,0,PAGE_SIZE);
             fileHandle.readPage(i, page);
             std::cout << "Getting next record: read page complete.\n";
             short slotCount;
@@ -539,7 +540,7 @@ namespace PeterDB {
                     //if tombstone, continue
                     if (flag == -1) continue;
                     else {
-                        char *condition = (char *) malloc(PAGE_SIZE);
+                        char *condition = (char *) malloc(PAGE_SIZE);memset(condition,0,PAGE_SIZE);
                         //read condition
                         RecordBasedFileManager &rbfm = RecordBasedFileManager::instance();
                         RID ridRead;
@@ -629,7 +630,7 @@ namespace PeterDB {
                         }
                         std::cout << "Getting next record: condition judge complete.\n";
                         int nullIndicatorSize = ceil(output.size() / 8.0);
-                        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+                        char *nullIndicator = (char *) malloc(nullIndicatorSize);memset(nullIndicator,0,nullIndicatorSize);
                         for (int p = 0; p < output.size(); p++) {
                             if (p % 8 == 7) {
                                 nullIndicator[p / 8] = 0;
@@ -649,7 +650,7 @@ namespace PeterDB {
                         std::cout << "Getting next record: condition satisfied, ridRead " << ridRead.pageNum
                         << ", " << ridRead.slotNum << std::endl;
                         for (int p = 0; p < output.size(); p++) {
-                            char *outputData = (char *) malloc(PAGE_SIZE);
+                            char *outputData = (char *) malloc(PAGE_SIZE);memset(outputData,0,PAGE_SIZE);
                             std::string outputAttribute = attributeNames[p];
                             std::cout << "Getting next record: condition satisfied, fetching attribute " << outputAttribute << std::endl;
                             AttrType type = recordDescriptor.at(output[p]).type;
@@ -705,7 +706,7 @@ namespace PeterDB {
         int nullBit = 0;
         int infoSize = 0;
         int nullIndicatorSize = ceil(recordDescriptor.size() / 8.0);
-        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);memset(nullIndicator,0,nullIndicatorSize);
         memcpy(nullIndicator, (char *) data + dataOffset, nullIndicatorSize);
         dataOffset += nullIndicatorSize;
         short fieldsNum = recordDescriptor.size();
@@ -784,7 +785,7 @@ namespace PeterDB {
                                                      const std::vector<Attribute> &recordDescriptor,
                                                      RID &rid, char *&record, short &recordSize) {
         short slotSize = recordSize;
-        char *newPage = (char *) malloc(PAGE_SIZE);
+        char *newPage = (char *) malloc(PAGE_SIZE);memset(newPage,0,PAGE_SIZE);
         short slotCount = 0;
         short targetSlot = getSlotTable(newPage, slotCount, slotSize);
         if (targetSlot != 0) {
@@ -909,7 +910,7 @@ namespace PeterDB {
                                                      short &recordSize) {
         //Insert record into existed page (specified by pageNum).
         //Record is joined by recordInfo and data.
-        char *oldPage = (char *) malloc(PAGE_SIZE);
+        char *oldPage = (char *) malloc(PAGE_SIZE);memset(oldPage,0,PAGE_SIZE);
         RC status = fileHandle.readPage(pageNum, oldPage);
         if (status == -1) {
 #ifdef DEBUG
