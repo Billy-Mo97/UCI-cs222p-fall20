@@ -148,11 +148,14 @@ namespace PeterDB {
         //Check whether catalog files exists.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
-        if (rbfm.openFile("Tables", fileHandle) == -1) { return -1; }
-        if (rbfm.closeFile(fileHandle) == -1) { return -1; }
-        if (rbfm.openFile("Columns", fileHandle) == -1) { return -1; }
-        if (rbfm.closeFile(fileHandle) == -1) { return -1; }
-        return 0;
+        RC r1 = rbfm.openFile("Tables", fileHandle);
+        if(r1 == 0) { rbfm.closeFile(fileHandle); }
+        RC r2 = rbfm.openFile("Columns", fileHandle);
+        if(r2 == 0) { rbfm.closeFile(fileHandle); }
+        if(r1 == 0 && r2 == 0)
+            return 0;
+        else
+            return -1;
     }
 
     RC RelationManager::createCatalog() {
@@ -535,6 +538,7 @@ namespace PeterDB {
         int tableId;
         std::string fileName;
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
+        std::cout << "Getting attributes: tableId " << tableId << " filename "<< fileName << std::endl;
         //Then, open "Columns" catalogue to find the attributes of the record.
         std::vector<std::string> attributeNames = {"column-name", "column-type", "column-length", "column-position"};
         RM_ScanIterator rmsi;
@@ -544,13 +548,14 @@ namespace PeterDB {
         void *returnedData = NULL;
         RID rid;
         returnedData = malloc(4096);
+        memset(returnedData, 0, 4096);
         while (rmsi.getNextTuple(rid, returnedData) != RM_EOF) {
-            memset(returnedData, 0, 4096);
             Attribute attr;
             int nullIndicatorSize = ceil(attributeNames.size() / 8.0);
             int dataOffset = nullIndicatorSize;
             int nameLen;
             memcpy(&nameLen, (char *) returnedData + dataOffset, sizeof(int));
+            std::cout << "Getting attribute: get attr name len " << nameLen << std::endl;
             dataOffset += sizeof(int);
             char *columnName = (char *) malloc(nameLen + 1);
             memset(columnName, 0, nameLen + 1);
@@ -558,6 +563,7 @@ namespace PeterDB {
             memcpy(columnName, (char *) returnedData + dataOffset, nameLen);
             dataOffset += nameLen;
             std::string name(columnName);
+            std::cout << "Getting attribute: get attr name " << name << std::endl;
             free(columnName);
             attr.name = name;
             AttrType type;
@@ -572,6 +578,7 @@ namespace PeterDB {
             memcpy(&columnPos, (char *) returnedData + dataOffset, sizeof(int));
             dataOffset += sizeof(int);
             pos_attr[columnPos] = attr;
+            memset(returnedData, 0, 4096);
         }
         free(returnedData);
         returnedData = NULL;

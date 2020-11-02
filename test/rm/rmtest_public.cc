@@ -56,11 +56,12 @@ namespace PeterDBTesting {
 
     }
 
-    /*TEST_F(RM_Tuple_Test, get_attributes) {
+    TEST_F(RM_Tuple_Test, get_attributes) {
         // Functions Tested
         // 1. getAttributes
 
         // GetAttributes
+        std::cout << "get_attributes test starts.\n";
         ASSERT_EQ(rm.getAttributes(tableName, attrs), success) << "RelationManager::getAttributes() should succeed.";
 
         ASSERT_EQ(attrs[0].name, "emp_name") << "Attribute is not correct.";
@@ -78,7 +79,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(RM_Tuple_Test, insert_and_read_tuple) {
+    /*TEST_F(RM_Tuple_Test, insert_and_read_tuple) {
         // Functions tested
         // 1. Insert Tuple
         // 2. Read Tuple
