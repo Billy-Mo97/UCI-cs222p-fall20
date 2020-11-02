@@ -441,12 +441,18 @@ namespace PeterDB {
                 AttrType type = recordDescriptor[i].type;
                 std::string name = recordDescriptor[i].name;
                 if (type == TypeInt) {
+                    int readInt;
+                    memcpy(&readInt, (char *) record + offset, sizeof(int));
+                    std::cout << "Reading attribute int: " << readInt << std::endl;
                     if (name == attributeName) {
                         memcpy((char *) data, (char *) record + offset, sizeof(int));
                         break;
                     }
                     offset += sizeof(int);
                 } else if (type == TypeReal) {
+                    int readReal;
+                    memcpy(&readReal, (char *) record + offset, sizeof(float));
+                    std::cout << "Reading attribute real: " << readReal << std::endl;
                     if (name == attributeName) {
                         memcpy((char *) data, (char *) record + offset, sizeof(float));
                         break;

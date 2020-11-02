@@ -303,6 +303,7 @@ namespace PeterDB {
         //Pre-check: check whether catalog tables exists.
         //if(checkCatalog() == -1) { return -1; }
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
+        std::cout << "deleteCatalog is called.\n";
         RC r1 = rbfm.destroyFile("Tables") == -1;
         RC r2 = rbfm.destroyFile("Columns") == -1;
         if (r1 == -1 || r2 == -1) { return -1; }
@@ -535,6 +536,7 @@ namespace PeterDB {
 
         //This function fetch the attributes from Catalog.
         //First, get the tableId and fileName of the table.
+        std::cout << "Getting attribute starts.\n";
         int tableId;
         std::string fileName;
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
@@ -585,7 +587,7 @@ namespace PeterDB {
         if (rmsi.close() == -1) { return -1; }
         //Push each attribute into vector
         attrs = std::vector<Attribute>(pos_attr.size());
-        for (int i = 0; i < pos_attr.size(); i++) { attrs[i] = pos_attr[i]; }
+        for (int i = 0; i < pos_attr.size(); i++) { attrs[i] = pos_attr[i + 1]; }
         return 0;
     }
 
@@ -687,13 +689,36 @@ namespace PeterDB {
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
         std::vector<Attribute> recordDescriptor;
         if (getAttributes(tableName, recordDescriptor) == -1) { return -1; }
-
+        std::cout << "Reading attribute: " << "tableId " << tableId << " fileName " << fileName << std::endl;
         //Then, delete the record from the table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
         if (rbfm.openFile(fileName, fileHandle) == -1) { return -1; }
+        void *readData = malloc(4096);
         if (rbfm.readAttribute(fileHandle, recordDescriptor, rid, attributeName, data) == -1) { return -1; }
+        int dataNullIndicatorSize = 1;
+        unsigned char dataNullIndicator[dataNullIndicatorSize];
+        dataNullIndicator[0] = 127; // 01111111
+        memcpy(data, dataNullIndicator, dataNullIndicatorSize);
+        short dataOffset = dataNullIndicatorSize;
+        for (auto attr : recordDescriptor) {
+            if (attr.name == attributeName) {
+                if(attr.type == TypeInt) {
+                    memcpy((char *) data + dataOffset, readData, sizeof(int));
+                    break;
+                } else if (attr.type == TypeReal) {
+                    memcpy((char *) data + dataOffset, readData, sizeof(float));
+                    break;
+                } else if (attr.type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, readData, sizeof(int));
+                    memcpy((char *) data + dataOffset, readData, sizeof(int) + strLen);
+                    break;
+                }
+            }
+        }
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
+        free(readData);
         return 0;
     }
 

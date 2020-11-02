@@ -1,7 +1,7 @@
 #include "test/utils/rm_test_util.h"
 
 namespace PeterDBTesting {
-    TEST_F(RM_Catalog_Test, create_and_delete_tables) {
+    /*TEST_F(RM_Catalog_Test, create_and_delete_tables) {
 
         // Try to delete the System Catalog.
         // If this is the first time, it will generate an error. It's OK and we will ignore that.
@@ -76,10 +76,10 @@ namespace PeterDBTesting {
         ASSERT_EQ(attrs[3].name, "salary") << "Attribute is not correct.";
         ASSERT_EQ(attrs[3].type, PeterDB::TypeReal) << "Attribute is not correct.";
         ASSERT_EQ(attrs[3].length, 4) << "Attribute is not correct.";
-
+        std::cout << "get_attributes test succeed.\n";
     }
 
-    /*TEST_F(RM_Tuple_Test, insert_and_read_tuple) {
+    TEST_F(RM_Tuple_Test, insert_and_read_tuple) {
         // Functions tested
         // 1. Insert Tuple
         // 2. Read Tuple
@@ -223,7 +223,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(memcmp(inBuffer, outBuffer, updatedTupleSize), 0)
                                     << "The returned tuple is not the same as the updated.";
 
-    }
+    }*/
 
     TEST_F(RM_Tuple_Test, read_attribute) {
         // Functions Tested
@@ -251,6 +251,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(rm.insertTuple(tableName, inBuffer, rid), success)
                                     << "RelationManager::insertTuple() should succeed.";
 
+        std::cout << "Starting to read attribute.\n";
         // Test Read Attribute
         ASSERT_EQ(rm.readAttribute(tableName, rid, "salary", outBuffer), success)
                                     << "RelationManager::readAttribute() should succeed.";
@@ -268,7 +269,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(RM_Tuple_Test, delete_table) {
+    /*TEST_F(RM_Tuple_Test, delete_table) {
         // Functions Tested
         // 0. Insert tuple;
         // 1. Read Tuple
