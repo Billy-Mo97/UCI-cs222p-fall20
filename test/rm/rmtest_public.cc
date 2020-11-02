@@ -36,10 +36,11 @@ namespace PeterDBTesting {
             ASSERT_TRUE(fileExists(tableName)) << "Table " << tableName << " file should exist now.";
 
         }
-
+        std::cout << "5 rm_test_tables create succeed.\n";
         for (int i = 1; i < 5; i++) {
             tableName = "rm_test_table_" + std::to_string(i);
             // Delete the table
+            std::cout << "Deleting " << tableName << std::endl;
             ASSERT_EQ(rm.deleteTable(tableName), success) << "Delete table " << tableName << " should succeed.";
             ASSERT_FALSE(fileExists(tableName)) << "Table " << tableName << " file should not exist now.";
         }

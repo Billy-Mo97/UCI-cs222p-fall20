@@ -228,12 +228,17 @@ namespace PeterDB {
             memcpy(&ithOffset, page + PAGE_SIZE - sizeof(short) * (i * 2 + 2) - sizeof(short), sizeof(short));
             if (ithOffset == -1) { deletedCount++; }
         }
-        slotCount -= deletedCount;
-        freeSpace += size + deletedCount * sizeof(short) * 2;
-        memcpy(page + PAGE_SIZE - sizeof(short) * 2, &slotCount, sizeof(short));
+        //slotCount -= deletedCount;
+        //freeSpace += size + deletedCount * sizeof(short) * 2;
+        freeSpace += size;
+        //memcpy(page + PAGE_SIZE - sizeof(short) * 2, &slotCount, sizeof(short));
         memcpy(page + PAGE_SIZE - sizeof(short), &freeSpace, sizeof(short));
         //if deleted slot is not in the back
-        if (slotNum < slotCount - 1) { shiftSlots(offset, slotNum + 1, slotCount, page); }
+        if (slotNum < slotCount - 1) {
+            //int shiftDirSize = 2 * sizeof(short) * (slotCount - 1 - slotNum);
+            //short shiftStart = PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4)
+            shiftSlots(offset, slotNum + 1, slotCount, page);
+        }
         int deleteFlag = -1;
         memcpy(page + PAGE_SIZE - sizeof(short) * (slotNum * 2 + 3), &deleteFlag, sizeof(short));
         status = fileHandle.writePage(pageNum, page);
@@ -261,6 +266,7 @@ namespace PeterDB {
             }
         }
         if (!flag) { return; }
+        //find last undeleted slot in [begin, end)
         for (short i = end - 1; i >= begin; i--) {
             memcpy(&endOffset, page + PAGE_SIZE - sizeof(short) * (4 + i * 2) + sizeof(short), sizeof(short));
             memcpy(&endSlotSize, page + PAGE_SIZE - sizeof(short) * (4 + i * 2), sizeof(short));
@@ -418,6 +424,7 @@ namespace PeterDB {
                                              const RID &rid, const std::string &attributeName, void *data) {
         char *record = (char *) malloc(PAGE_SIZE);
         RC status = readRecord(fileHandle, recordDescriptor, rid, record);
+        printRecord(recordDescriptor, record, std::cout);
         if (status == -1) {
 #ifdef DEBUG
             std::cerr << "Cannot read record when reading attribute." << std::endl;
@@ -477,7 +484,12 @@ namespace PeterDB {
         rbfm_ScanIterator.curSlot = -1;
         rbfm_ScanIterator.maxPage = fileHandle.numOfPages - 1;
         rbfm_ScanIterator.setFileHandle(fileHandle);
+        if (rbfm_ScanIterator.fileHandle.pointer == nullptr) {
+            std::cout << "Scanning: fileHandle is pointing to nullptr.\n";
+            return -1;
+        }
         rbfm_ScanIterator.setRecordDescriptor(recordDescriptor);
+        std::cout << "Scanning: successfully set fileHandle and recordDescriptor.\n";
         for (int i = 0; i < recordDescriptor.size(); i++) {
             if (recordDescriptor[i].name == conditionAttribute) {
                 rbfm_ScanIterator.setConditionPos(i);
@@ -485,21 +497,33 @@ namespace PeterDB {
                 break;
             }
         }
+        std::cout << "Scanning: successfully set condition attributes and position.\n";
         rbfm_ScanIterator.setValue(value);
+        std::cout << "Scanning: successfully set value.\n";
         rbfm_ScanIterator.setAttributeNames(attributeNames);
         rbfm_ScanIterator.setCompOp(compOp);
+        std::cout << "Scanning: successfully set all.\n";
         return 0;
     }
 
     RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
-        for (int i = curPage; i < maxPage; i++) {
+        if (fileHandle.pointer == nullptr) {
+            std::cout << "Scanning: fileHandle is pointing to nullptr.\n";
+            return -1;
+        }
+        for (int i = curPage; i <= maxPage; i++) {
+            std::cout << "Getting next record: start.\n";
             char *page = (char *) malloc(PAGE_SIZE);
-            fileHandle->readPage(i, page);
+            fileHandle.readPage(i, page);
+            std::cout << "Getting next record: read page complete.\n";
             short slotCount;
             memcpy(&slotCount, page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
             int startSlot = 0;
             if (i == curPage) startSlot = curSlot + 1;
+            std::cout << "Getting next record: doing condition judge.\n";
             for (int j = startSlot; j < slotCount; j++) {
+                std::cout << "i: " << i << std::endl;
+                std::cout << "j: " << j << std::endl;
                 short slotOffset;
                 memcpy(&slotOffset, page + PAGE_SIZE - sizeof(short) * (3 + 2 * j), sizeof(short));
                 //if not deleted
@@ -512,76 +536,125 @@ namespace PeterDB {
                         char *condition = (char *) malloc(PAGE_SIZE);
                         //read condition
                         RecordBasedFileManager &rbfm = RecordBasedFileManager::instance();
-                        rbfm.readAttribute(*fileHandle, recordDescriptor, rid, conditionAttribute, condition);
-                        //compare condition with value using compOperator
-                        AttrType type = recordDescriptor.at(conditionPos).type;
-                        if (type == TypeInt) {
-                            int val;
-                            memcpy(&val, condition, sizeof(int));
-                            int conditionVal;
-                            memcpy(&conditionVal, value, sizeof(int));
-                            if (val - conditionVal > 0 &&
-                                (compOp == NO_OP || compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP))
-                                continue;
-                            if (val - conditionVal == 0 &&
-                                (compOp == NO_OP || compOp == LT_OP || compOp == GT_OP))
-                                continue;
-                            if (val - conditionVal < 0 &&
-                                (compOp == NO_OP || compOp == GE_OP || compOp == GE_OP || compOp == EQ_OP))
-                                continue;
-                        } else if (type == TypeReal) {
-                            float val;
-                            memcpy(&val, condition, sizeof(float));
-                            float conditionVal;
-                            memcpy(&conditionVal, value, sizeof(float));
-                            if (val - conditionVal > 0 &&
-                                (compOp == NO_OP || compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP))
-                                continue;
-                            if (val - conditionVal == 0 &&
-                                (compOp == NO_OP || compOp == LT_OP || compOp == GT_OP))
-                                continue;
-                            if (val - conditionVal < 0 &&
-                                (compOp == NO_OP || compOp == GE_OP || compOp == GE_OP || compOp == EQ_OP))
-                                continue;
-                        } else if (type == TypeVarChar) {
-                            int strLen;
-                            memcpy(&strLen, condition, sizeof(int));
-                            char *val;
-                            char *conditionVal;
-                            memcpy(val, (char *) condition + sizeof(int), strLen);
-                            memcpy(conditionVal, (char *) value + sizeof(int), strLen);
-                            if (strcmp(val, conditionVal) > 0 &&
-                                (compOp == NO_OP || compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP))
-                                continue;
-                            if (strcmp(val, conditionVal) &&
-                                (compOp == NO_OP || compOp == LT_OP || compOp == GT_OP))
-                                continue;
-                            if (strcmp(val, conditionVal) &&
-                                (compOp == NO_OP || compOp == GE_OP || compOp == GE_OP || compOp == EQ_OP))
-                                continue;
-                        }
-                        if (condition != nullptr) free(condition);
-                        //if satisfy, get output attributes, return 0
-                        std::vector<int> output;
-                        for (int p = 0; p < attributeNames.size(); p++) {
-                            for (int q = 0; q < recordDescriptor.size(); q++) {
-                                if (recordDescriptor[q].name == attributeNames[p]) output.push_back(q);
+                        RID ridRead;
+                        ridRead.pageNum = i;
+                        ridRead.slotNum = j;
+                        rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, conditionAttribute, condition);
+                        std::cout << "Getting next record: reading condition value.\n";
+                        if(value != NULL) {
+                            std::cout << "Getting next record: condition value not null" << std::endl;
+                            //compare condition with value using compOperator
+                            AttrType type = recordDescriptor.at(conditionPos).type;
+                            if (type == TypeInt) {
+                                int readVal;
+                                memcpy(&readVal, condition, sizeof(int));
+                                int conditionVal;
+                                memcpy(&conditionVal, value, sizeof(int));
+                                if (readVal - conditionVal > 0 &&
+                                    (compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP))
+                                    continue;
+                                if (readVal - conditionVal == 0 &&
+                                    (compOp == LT_OP || compOp == GT_OP))
+                                    continue;
+                                if (readVal - conditionVal < 0 &&
+                                    (compOp == GE_OP || compOp == GT_OP || compOp == EQ_OP))
+                                    continue;
+                            } else if (type == TypeReal) {
+                                float readVal;
+                                memcpy(&readVal, condition, sizeof(float));
+                                float conditionVal;
+                                memcpy(&conditionVal, value, sizeof(float));
+                                if (readVal - conditionVal > 0 &&
+                                    (compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP))
+                                    continue;
+                                if (readVal - conditionVal == 0 &&
+                                    (compOp == LT_OP || compOp == GT_OP))
+                                    continue;
+                                if (readVal - conditionVal < 0 &&
+                                    (compOp == GE_OP || compOp == GT_OP || compOp == EQ_OP))
+                                    continue;
+                            } else if (type == TypeVarChar) {
+                                int readStrLen;
+                                memcpy(&readStrLen, condition, sizeof(int));
+                                char readVal[readStrLen + 1];
+                                memset(readVal, 0, readStrLen + 1);
+                                readVal[readStrLen] = '\0';
+                                memcpy(readVal, (char *) condition + sizeof(int), readStrLen);
+                                int conditionStrLen;
+                                memcpy(&conditionStrLen, (char *) value, sizeof(int));
+                                char conditionVal[conditionStrLen + 1];
+                                memset(conditionVal, 0, conditionStrLen + 1);
+                                conditionVal[conditionStrLen] = '\0';
+                                memcpy(conditionVal, (char *) value + sizeof(int), conditionStrLen);
+                                std::string readStr(readVal);
+                                std::cout << "Getting next record: condition string:" << conditionVal << std::endl;
+                                std::cout << "Getting next record: reading string:" << readStr << std::endl;
+                                if (strcmp(readVal, conditionVal) > 0 &&
+                                    (compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP))
+                                    continue;
+                                if (strcmp(readVal, conditionVal) == 0 &&
+                                    (compOp == LT_OP || compOp == GT_OP))
+                                    continue;
+                                if (strcmp(readVal, conditionVal) < 0 &&
+                                    (compOp == GE_OP || compOp == GT_OP || compOp == EQ_OP))
+                                    continue;
                             }
                         }
+                        if (condition != nullptr) {
+                            free(condition);
+                            condition = nullptr;
+                        }
+                        //if satisfy, get output attributes, return 0
+                        std::vector<int> output;
+                        int dataSize = 0;
+                        for (int p = 0; p < attributeNames.size(); p++) {
+                            for (int q = 0; q < recordDescriptor.size(); q++) {
+                                if (recordDescriptor[q].name == attributeNames[p]) {
+                                    output.push_back(q);
+                                    if (recordDescriptor[q].type == TypeInt) {
+                                        dataSize += sizeof(int);
+                                    } else if (recordDescriptor[q].type == TypeReal) {
+                                        dataSize += sizeof(float);
+                                    } else if (recordDescriptor[q].type == TypeVarChar) {
+                                        dataSize += sizeof(int) + recordDescriptor[q].length;
+                                    }
+                                }
+                            }
+                        }
+                        std::cout << "Getting next record: condition judge complete.\n";
                         int nullIndicatorSize = ceil(output.size() / 8.0);
                         char *nullIndicator = (char *) malloc(nullIndicatorSize);
-                        char nullfield = 0;
+                        for (int p = 0; p < output.size(); p++) {
+                            if (p % 8 == 7) {
+                                nullIndicator[p / 8] = 0;
+                            } else if (p == output.size() - 1) {
+                                std::cout << "nullIndicatorSize = " << nullIndicatorSize << std::endl;
+                                int nullSize = 8 - (p % 8 + 1);
+                                char nullField = (2 << nullSize - 1) - 1;
+                                std::cout << "Getting next record: condition satisfied, nullField = " <<  (2 << nullSize - 1) - 1 << std::endl;
+                                nullIndicator[p / 8] = nullField;
+                            }
+                        }
+                        dataSize += nullIndicatorSize;
                         int dataOffset = nullIndicatorSize;
+                        //data = malloc(dataSize);
+                        memset(data, 0, dataSize);
+                        memcpy(data, nullIndicator, nullIndicatorSize);
+                        std::cout << "Getting next record: condition satisfied, ridRead " << ridRead.pageNum
+                        << ", " << ridRead.slotNum << std::endl;
                         for (int p = 0; p < output.size(); p++) {
                             char *outputData = (char *) malloc(PAGE_SIZE);
                             std::string outputAttribute = attributeNames[p];
+                            std::cout << "Getting next record: condition satisfied, fetching attribute " << outputAttribute << std::endl;
                             AttrType type = recordDescriptor.at(output[p]).type;
-                            rbfm.readAttribute(*fileHandle, recordDescriptor, rid, outputAttribute, outputData);
+                            rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, outputAttribute, outputData);
                             char null;
                             memcpy(&null, outputData, sizeof(char));
                             if (null != -1) {
-                                nullfield += 1 << (7 - p % 8);
                                 if (type == TypeInt) {
+                                    int readInt;
+                                    memcpy(&readInt, outputData, sizeof(int));
+                                    std::cout << "Getting next record: condition satisfied, fetch " << readInt << std::endl;
                                     memcpy((char *) data + dataOffset, outputData, sizeof(int));
                                     dataOffset += sizeof(int);
                                 } else if (type == TypeReal) {
@@ -590,20 +663,21 @@ namespace PeterDB {
                                 } else if (type == TypeVarChar) {
                                     int strLen;
                                     memcpy(&strLen, outputData, sizeof(int));
+                                    std::cout << "Getting next record: condition satisfied, fetch string len of " << strLen << std::endl;
                                     memcpy((char *) data + dataOffset, outputData, sizeof(int) + strLen);
                                     dataOffset += sizeof(int) + strLen;
                                 }
                             }
-                            nullIndicator[p / 8] = nullfield;
                             if (outputData != nullptr) free(outputData);
+                            std::cout << "Getting next record: condition satisfied, fetch one attribute done.\n";
                         }
-                        memcpy(data, nullIndicator, nullIndicatorSize);
                         curPage = i;
                         curSlot = j;
                         rid.pageNum = i;
                         rid.slotNum = j;
                         if (page != nullptr) free(page);
                         if (nullIndicator != nullptr) free(nullIndicator);
+                        std::cout << "Getting next record complete.\n";
                         return 0;
                     }
                 }

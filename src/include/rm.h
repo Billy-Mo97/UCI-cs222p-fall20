@@ -10,7 +10,7 @@ namespace PeterDB {
 #define RM_EOF (-1)  // end of a scan operator
 
     typedef enum {
-        System = 0, User
+        System = 0, User = 1
     } TableFlagType;
 
     // RM_ScanIterator is an iterator to go through tuples
@@ -33,15 +33,16 @@ namespace PeterDB {
     public:
         static RelationManager &instance();
 
-        void prepareTableAttribute(std::vector<Attribute> &tableAttributeDescriptor, int &tableDataSize);
+        void prepareTableAttribute(std::vector<Attribute> &tableAttributeDescriptor, std::string tableName,
+                                   std::string fileName, int &tableDataSize);
 
-        void prepareTableData(int tableId, std::string tableName, std::string fileName, TableFlagType tableFlag,
+        void prepareTableData(int tableId, std::string tableName, std::string fileName, int tableFlag,
                               std::vector<Attribute> &tableAttributeDescriptor, void *tableData);
 
-        void prepareColumnAttribute(std::vector<Attribute> &columnAttributeDescriptor, int &columnDataSize);
+        void prepareColumnAttribute(std::vector<Attribute> &columnAttributeDescriptor, std::string columnName, int &columnDataSize);
 
         void prepareColumnData(int tableId, std::string columnName, AttrType columnType, int columnLength,
-                               int columnPosition, TableFlagType tableFlag, std::vector<Attribute> &columnAttributeDescriptor, void *columnData);
+                               int columnPosition, int tableFlag, std::vector<Attribute> &columnAttributeDescriptor, void *columnData);
 
         RC checkCatalog();
 

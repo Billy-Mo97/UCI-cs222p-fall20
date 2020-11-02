@@ -69,10 +69,10 @@ namespace PeterDB {
         RC getNextRecord(RID &rid, void *data);
 
         RC close() {
-            fileHandle = NULL;
             recordDescriptor.clear();
             conditionPos = 0;
             compOp = NO_OP;
+            free(value);
             value = NULL;
             attributeNames.clear();
             conditionAttribute = "";
@@ -84,7 +84,7 @@ namespace PeterDB {
 
         int curPage, maxPage;
         short curSlot;
-        FileHandle *fileHandle = NULL;
+        FileHandle fileHandle;
         std::vector<Attribute> recordDescriptor;
         int conditionPos = 0;
         CompOp compOp = NO_OP;
@@ -93,7 +93,7 @@ namespace PeterDB {
         std::string conditionAttribute = "";
 
         void setFileHandle(FileHandle &fileHandle) {
-            RBFM_ScanIterator::fileHandle = &fileHandle;
+            RBFM_ScanIterator::fileHandle = fileHandle;
         }
 
         void setRecordDescriptor(const std::vector<Attribute> &recordDescriptor) {
@@ -110,6 +110,10 @@ namespace PeterDB {
 
         void setValue(const void *value) {
             AttrType conditionType = RBFM_ScanIterator::recordDescriptor.at(RBFM_ScanIterator::conditionPos).type;
+            if (value == NULL) {
+                RBFM_ScanIterator::value = NULL;
+                return;
+            }
             if (conditionType == TypeInt) {
                 RBFM_ScanIterator::value = malloc(sizeof(int));
                 memcpy(RBFM_ScanIterator::value, value, sizeof(int));

@@ -92,6 +92,10 @@ namespace PeterDB {
         if (pageNum < 0 || pageNum > numOfPages) {
             return -1;
         }
+        if (pointer == nullptr) {
+            std::cout << "fileHandle is pointing to nullptr.\n";
+            return -1;
+        }
         fseek(pointer, (pageNum + 1) * PAGE_SIZE, SEEK_SET);
         int result = fread(data, 1, PAGE_SIZE, pointer);
         if (result != PAGE_SIZE) {
