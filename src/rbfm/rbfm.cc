@@ -251,7 +251,7 @@ namespace PeterDB {
             return -1;
         }
         if (page != nullptr) free(page);
-        std::cout << "delete page:" << pageNum << " slot:" << slotNum << " complete" << std::endl;
+        //std::cout << "delete page:" << pageNum << " slot:" << slotNum << " complete" << std::endl;
         return 0;
     }
 
@@ -444,7 +444,7 @@ namespace PeterDB {
                 if (type == TypeInt) {
                     int readInt;
                     memcpy(&readInt, (char *) record + offset, sizeof(int));
-                    std::cout << "Reading attribute int: " << readInt << std::endl;
+                    //std::cout << "Reading attribute int: " << readInt << std::endl;
                     if (name == attributeName) {
                         memcpy((char *) data, (char *) record + offset, sizeof(int));
                         break;
@@ -453,7 +453,7 @@ namespace PeterDB {
                 } else if (type == TypeReal) {
                     int readReal;
                     memcpy(&readReal, (char *) record + offset, sizeof(float));
-                    std::cout << "Reading attribute real: " << readReal << std::endl;
+                    //std::cout << "Reading attribute real: " << readReal << std::endl;
                     if (name == attributeName) {
                         memcpy((char *) data, (char *) record + offset, sizeof(float));
                         break;
@@ -492,11 +492,11 @@ namespace PeterDB {
         rbfm_ScanIterator.maxPage = fileHandle.numOfPages - 1;
         rbfm_ScanIterator.setFileHandle(fileHandle);
         if (rbfm_ScanIterator.fileHandle.pointer == nullptr) {
-            std::cout << "Scanning: fileHandle is pointing to nullptr.\n";
+            //std::cout << "Scanning: fileHandle is pointing to nullptr.\n";
             return -1;
         }
         rbfm_ScanIterator.setRecordDescriptor(recordDescriptor);
-        std::cout << "Scanning: successfully set fileHandle and recordDescriptor.\n";
+        //std::cout << "Scanning: successfully set fileHandle and recordDescriptor.\n";
         for (int i = 0; i < recordDescriptor.size(); i++) {
             if (recordDescriptor[i].name == conditionAttribute) {
                 rbfm_ScanIterator.setConditionPos(i);
@@ -504,40 +504,40 @@ namespace PeterDB {
                 break;
             }
         }
-        std::cout << "Scanning: successfully set condition attributes and position.\n";
+       // std::cout << "Scanning: successfully set condition attributes and position.\n";
         rbfm_ScanIterator.setValue(value);
-        std::cout << "Scanning: successfully set value.\n";
+        //std::cout << "Scanning: successfully set value.\n";
         rbfm_ScanIterator.setAttributeNames(attributeNames);
         rbfm_ScanIterator.setCompOp(compOp);
-        std::cout << "Scanning: successfully set all.\n";
+       // std::cout << "Scanning: successfully set all.\n";
         return 0;
     }
 
     RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
         if (fileHandle.pointer == nullptr) {
-            std::cout << "Scanning: fileHandle is pointing to nullptr.\n";
+            //std::cout << "Scanning: fileHandle is pointing to nullptr.\n";
             return -1;
         }
         for (int i = curPage; i <= maxPage; i++) {
-            std::cout << "Getting next record: start.\n";
+           // std::cout << "Getting next record: start.\n";
             char *page = (char *) malloc(PAGE_SIZE); memset(page,0,PAGE_SIZE);
             if(fileHandle.readPage(i, page) == -1) {
                 free(page);
                 return RBFM_EOF;
             }
-            std::cout << "Getting next record: read page complete.\n";
+          //  std::cout << "Getting next record: read page complete.\n";
             short slotCount;
             memcpy(&slotCount, page + PAGE_SIZE - 2 * sizeof(short), sizeof(short));
             int startSlot = 0;
             if (i == curPage) startSlot = curSlot + 1;
-            std::cout << "Getting next record: doing condition judge.\n";
-            std::cout << "startSlot: " << startSlot << std::endl;
-            std::cout << "curPage: " << curPage << std::endl;
-            std::cout << "maxPage: " << maxPage << std::endl;
+           // std::cout << "Getting next record: doing condition judge.\n";
+            //std::cout << "startSlot: " << startSlot << std::endl;
+            //std::cout << "curPage: " << curPage << std::endl;
+            //std::cout << "maxPage: " << maxPage << std::endl;
             for (int j = startSlot; j < slotCount; j++) {
-                std::cout << "i: " << i << std::endl;
-                std::cout << "j: " << j << std::endl;
-                std::cout << "slotCount: " << slotCount << std::endl;
+                //std::cout << "i: " << i << std::endl;
+                //std::cout << "j: " << j << std::endl;
+                //std::cout << "slotCount: " << slotCount << std::endl;
                 short slotOffset;
                 memcpy(&slotOffset, page + PAGE_SIZE - sizeof(short) * (3 + 2 * j), sizeof(short));
                 //if not deleted
@@ -554,7 +554,7 @@ namespace PeterDB {
                         ridRead.pageNum = i;
                         ridRead.slotNum = j;
                         rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, conditionAttribute, condition);
-                        std::cout << "Getting next record: reading condition value.\n";
+                        //std::cout << "Getting next record: reading condition value.\n";
                         //if condition is null
                         char nullFlag;
                         memcpy(&nullFlag,condition,sizeof(char));
@@ -563,7 +563,7 @@ namespace PeterDB {
                             continue;
                         }
                         if(value != NULL) {
-                            std::cout << "Getting next record: condition value not null" << std::endl;
+                            //std::cout << "Getting next record: condition value not null" << std::endl;
                             //compare condition with value using compOperator
                             AttrType type = recordDescriptor.at(conditionPos).type;
                             if (type == TypeInt) {
@@ -608,8 +608,8 @@ namespace PeterDB {
                                 conditionVal[conditionStrLen] = '\0';
                                 memcpy(conditionVal, (char *) value + sizeof(int), conditionStrLen);
                                 std::string readStr(readVal);
-                                std::cout << "Getting next record: condition string:" << conditionVal << std::endl;
-                                std::cout << "Getting next record: reading string:" << readStr << std::endl;
+                                //std::cout << "Getting next record: condition string:" << conditionVal << std::endl;
+                                //std::cout << "Getting next record: reading string:" << readStr << std::endl;
                                 if (strcmp(readVal, conditionVal) > 0 &&
                                     (compOp == LE_OP || compOp == LT_OP || compOp == EQ_OP))
                                     continue;
@@ -642,17 +642,17 @@ namespace PeterDB {
                                 }
                             }
                         }
-                        std::cout << "Getting next record: condition judge complete.\n";
+                        //std::cout << "Getting next record: condition judge complete.\n";
                         int nullIndicatorSize = ceil(output.size() / 8.0);
                         char *nullIndicator = (char *) malloc(nullIndicatorSize); memset(nullIndicator,0,nullIndicatorSize);
                         for (int p = 0; p < output.size(); p++) {
                             if (p % 8 == 7) {
                                 nullIndicator[p / 8] = 0;
                             } else if (p == output.size() - 1) {
-                                std::cout << "nullIndicatorSize = " << nullIndicatorSize << std::endl;
+                                //std::cout << "nullIndicatorSize = " << nullIndicatorSize << std::endl;
                                 int nullSize = 8 - (p % 8 + 1);
                                 char nullField = (2 << nullSize - 1) - 1;
-                                std::cout << "Getting next record: condition satisfied, nullField = " <<  (2 << nullSize - 1) - 1 << std::endl;
+                                //std::cout << "Getting next record: condition satisfied, nullField = " <<  (2 << nullSize - 1) - 1 << std::endl;
                                 nullIndicator[p / 8] = nullField;
                             }
                         }
@@ -661,12 +661,12 @@ namespace PeterDB {
                         //data = malloc(dataSize);
                         memset(data, 0, dataSize);
                         memcpy(data, nullIndicator, nullIndicatorSize);
-                        std::cout << "Getting next record: condition satisfied, ridRead " << ridRead.pageNum
-                        << ", " << ridRead.slotNum << std::endl;
+                        //std::cout << "Getting next record: condition satisfied, ridRead " << ridRead.pageNum
+                       // << ", " << ridRead.slotNum << std::endl;
                         for (int p = 0; p < output.size(); p++) {
                             char *outputData = (char *) malloc(PAGE_SIZE); memset(outputData,0,PAGE_SIZE);
                             std::string outputAttribute = attributeNames[p];
-                            std::cout << "Getting next record: condition satisfied, fetching attribute " << outputAttribute << std::endl;
+                            //std::cout << "Getting next record: condition satisfied, fetching attribute " << outputAttribute << std::endl;
                             AttrType type = recordDescriptor.at(output[p]).type;
                             rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, outputAttribute, outputData);
                             char null;
@@ -675,7 +675,7 @@ namespace PeterDB {
                                 if (type == TypeInt) {
                                     int readInt;
                                     memcpy(&readInt, outputData, sizeof(int));
-                                    std::cout << "Getting next record: condition satisfied, fetch " << readInt << std::endl;
+                                   // std::cout << "Getting next record: condition satisfied, fetch " << readInt << std::endl;
                                     memcpy((char *) data + dataOffset, outputData, sizeof(int));
                                     dataOffset += sizeof(int);
                                 } else if (type == TypeReal) {
@@ -684,13 +684,13 @@ namespace PeterDB {
                                 } else if (type == TypeVarChar) {
                                     int strLen;
                                     memcpy(&strLen, outputData, sizeof(int));
-                                    std::cout << "Getting next record: condition satisfied, fetch string len of " << strLen << std::endl;
+                                   // std::cout << "Getting next record: condition satisfied, fetch string len of " << strLen << std::endl;
                                     memcpy((char *) data + dataOffset, outputData, sizeof(int) + strLen);
                                     dataOffset += sizeof(int) + strLen;
                                 }
                             }
                             if (outputData != nullptr) free(outputData);
-                            std::cout << "Getting next record: condition satisfied, fetch one attribute done.\n";
+                            //std::cout << "Getting next record: condition satisfied, fetch one attribute done.\n";
                         }
                         curPage = i;
                         curSlot = j;
@@ -698,7 +698,7 @@ namespace PeterDB {
                         rid.slotNum = j;
                         if (page != nullptr) free(page);
                         if (nullIndicator != nullptr) free(nullIndicator);
-                        std::cout << "Getting next record complete.\n";
+                        //std::cout << "Getting next record complete.\n";
                         return 0;
                     }
                 }
