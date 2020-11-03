@@ -368,7 +368,7 @@ namespace PeterDBTesting {
             ages.erase(target);
         }
     }
-    //stack overflow!!!!!!!!
+
     TEST_F(RM_Scan_Test, simple_scan_after_table_deletion) {
         // Functions Tested
         // 1. Simple scan
