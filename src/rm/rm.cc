@@ -334,7 +334,7 @@ namespace PeterDB {
             int dataOffset = nullIndicatorSize;
             int currentId;
             memcpy(&currentId, (char *) returnedData + dataOffset, sizeof(int));
-            std::cout << "currentId: " << currentId << std::endl;
+            //std::cout << "currentId: " << currentId << std::endl;
             maxId = maxId > currentId ? maxId : currentId;
         }
         //std::cout << "maxId: " << maxId << std::endl;
@@ -765,7 +765,10 @@ namespace PeterDB {
     RM_ScanIterator::~RM_ScanIterator() = default;
 
     RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
-        return rbfm_ScanIterator.getNextRecord(rid, data);
+        if (rbfm_ScanIterator.getNextRecord(rid, data) == RBFM_EOF)
+            return RM_EOF;
+        else
+            return 0;
     }
 
     RC RM_ScanIterator::close() {

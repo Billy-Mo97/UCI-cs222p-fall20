@@ -6,20 +6,19 @@
  - Github Repo Link:https://github.com/UCI-Chenli-teaching/cs222p-fall20-team-102
  - Student 1 UCI NetID:hanyanw3
  - Student 1 Name:Hanyan Wang
- - Student 2 UCI NetID (if applicable):
- - Student 2 Name (if applicable):
+ - Student 2 UCI NetID (if applicable): jiaminm1
+ - Student 2 Name (if applicable): Jiaming Mo
 
 ### 2. Meta-data
 - Show your meta-data design (Tables and Columns table) and information about each column.
-
+We keep it same in project description.
+Tables (table-id:int, table-name:varchar(50), file-name:varchar(50), table-flag:int)
+Columns(table-id:int, column-name:varchar(50), column-type:int, column-length:int, column-position:int, table-flag: int)
 
 
 ### 3. Internal Record Format (in case you have changed from P1, please re-enter here)
 - Show your record format design.
-1.fieldNum(short)
-2.nullIndicator(ceil(recordDescriptor.size() / 8.0))
-3.nonNull fields offsets(shorts)
-4.real data
+
 
 
 - Describe how you store a null field.
@@ -27,7 +26,8 @@ same as P1
 
 
 - Describe how you store a VarChar field.
-same as P1
+
+
 
 - Describe how your record design satisfies O(1) field access.
 same as P1
@@ -47,11 +47,11 @@ then directory(offset(short), slotSize(short)) one by one.
 
 ### 5. Page Management (in case you have changed from P1, please re-enter here)
 - How many hidden pages are utilized in your design?
-same as P1
+same as P1, one page
 
 
 - Show your hidden page(s) format design if applicable
-same as P1
+same as P1.
 
 
 ### 6. Describe the following operation logic.
@@ -90,17 +90,20 @@ continue to next record
 
 ### 7. Implementation Detail
 - Other implementation details goes here.
-
+We try to follow al the principles and details introduced in project description and lectures.
+However, there is one problem stated in piazza post @82, forced us to insert the "table-flag" tuples
+of "Tables" and "Columns" after all other 3+5 tuples, in order to pass catalog_columns_table_check.
 
 
 ### 8. Member contribution (for team of two)
 - Explain how you distribute the workload in team.
-Hanyan Wang: wrote rbfm, debug rdfm and rm
 
+Hanyan Wang: wrote rbfm, debug rdfm and rm
+Jiaming Mo: wrote rbfm, debug rbfm and rm
 
 ### 9. Other (optional)
 - Freely use this section to tell us about things that are related to the project 1, but not related to the other sections (optional)
-
+We feel that some functions in RBFM layer that are not finished in project 1 deserve some individual test cases.
 
 
 - Feedback on the project to help improve the project. (optional)
