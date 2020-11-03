@@ -642,7 +642,7 @@ namespace PeterDBTesting {
         outBuffer = malloc(bufSize);
 
         size_t nullAttributesIndicatorActualSize = getActualByteForNullsIndicator(attrs.size());
-
+        std::cout << "get next tuple loop starts.\n";
         while (rmsi.getNextTuple(rid, outBuffer) != RM_EOF) {
 
             size_t offset = 0;
@@ -666,10 +666,11 @@ namespace PeterDBTesting {
                 }
             }
             unsigned attr25 = *(unsigned *) ((uint8_t *) outBuffer + offset + nullAttributesIndicatorActualSize);
-
+            std::cout << "attr25: " << attr25 << std::endl;
             ASSERT_EQ(attr29, attr25 + 1);
             free(attr15);
             count++;
+            std::cout << "test scan count: " << count << std::endl;
             memset(outBuffer, 0, bufSize);
         }
 
