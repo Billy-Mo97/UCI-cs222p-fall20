@@ -674,7 +674,7 @@ namespace PeterDB {
                             /*char null;
                             memcpy(&null, outputData, sizeof(char));*/
                             if(r == 1)
-                                std::cout << "null == -1.\n";
+                                //std::cout << "null == -1.\n";
                             if (r != 1) {
                                 if (type == TypeInt) {
                                     int readInt;
@@ -685,7 +685,7 @@ namespace PeterDB {
                                 } else if (type == TypeReal) {
                                     float readReal;
                                     memcpy(&readReal, outputData, sizeof(float));
-                                    std::cout << "Getting next record: condition satisfied, fetch " << readReal << std::endl;
+                                    //std::cout << "Getting next record: condition satisfied, fetch " << readReal << std::endl;
                                     memcpy((char *) data + dataOffset, outputData, sizeof(float));
                                     dataOffset += sizeof(float);
                                 } else if (type == TypeVarChar) {

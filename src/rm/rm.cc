@@ -334,7 +334,7 @@ namespace PeterDB {
             int dataOffset = nullIndicatorSize;
             int currentId;
             memcpy(&currentId, (char *) returnedData + dataOffset, sizeof(int));
-            std::cout << "currentId: " << currentId << std::endl;
+            //std::cout << "currentId: " << currentId << std::endl;
             maxId = maxId > currentId ? maxId : currentId;
         }
         //std::cout << "maxId: " << maxId << std::endl;
