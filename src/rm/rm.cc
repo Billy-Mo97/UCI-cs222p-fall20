@@ -765,7 +765,10 @@ namespace PeterDB {
     RM_ScanIterator::~RM_ScanIterator() = default;
 
     RC RM_ScanIterator::getNextTuple(RID &rid, void *data) {
-        return rbfm_ScanIterator.getNextRecord(rid, data);
+        if (rbfm_ScanIterator.getNextRecord(rid, data) == RBFM_EOF)
+            return RM_EOF;
+        else
+            return 0;
     }
 
     RC RM_ScanIterator::close() {
