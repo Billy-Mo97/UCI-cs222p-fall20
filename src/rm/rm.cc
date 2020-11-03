@@ -385,7 +385,7 @@ namespace PeterDB {
     RC RelationManager::deleteTable(const std::string &tableName) {
         //Pre-check: check whether catalog tables exists.
         if (checkCatalog() == -1) { return -1; }
-
+        if(tableName == "Tables" || tableName == "Columns") return -1;
         //First, open "Tables" table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;

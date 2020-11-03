@@ -555,6 +555,13 @@ namespace PeterDB {
                         ridRead.slotNum = j;
                         rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, conditionAttribute, condition);
                         std::cout << "Getting next record: reading condition value.\n";
+                        //if condition is null
+                        char nullFlag;
+                        memcpy(&nullFlag,condition,sizeof(char));
+                        if(nullFlag == -1){
+                            free(condition);
+                            continue;
+                        }
                         if(value != NULL) {
                             std::cout << "Getting next record: condition value not null" << std::endl;
                             //compare condition with value using compOperator

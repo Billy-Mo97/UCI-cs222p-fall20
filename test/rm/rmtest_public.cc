@@ -676,7 +676,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(count, 3000) << "Number of scanned tuples is incorrect.";
     }
 
-    /*TEST_F(RM_Scan_Test, conditional_scan) {
+    TEST_F(RM_Scan_Test, conditional_scan) {
         // Functions Tested:
         // 1. Conditional scan
 
@@ -1022,6 +1022,6 @@ namespace PeterDBTesting {
 //
 //        checkPrintRecord("emp_name: Peter Anteater, age: 34, height: 175.3, salary: 24123.90, ssn: 123479765",
 //                         stream.str());
-//    }*/
+//    }
 
 } // namespace PeterDBTesting
