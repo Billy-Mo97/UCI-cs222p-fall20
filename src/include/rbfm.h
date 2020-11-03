@@ -2,7 +2,7 @@
 #define _rbfm_h_
 
 #include <vector>
-
+#include "string.h"
 #include "pfm.h"
 
 namespace PeterDB {
@@ -35,6 +35,11 @@ namespace PeterDB {
         NE_OP,      // !=
         NO_OP       // no condition
     } CompOp;
+    struct Tombstone {//7 bytes
+        char flag;
+        int pageNum;
+        short slotNum;
+    };
 
 
     /********************************************************************
@@ -61,9 +66,78 @@ namespace PeterDB {
         // Never keep the results in the memory. When getNextRecord() is called,
         // a satisfying record needs to be fetched from the file.
         // "data" follows the same format as RecordBasedFileManager::insertRecord().
-        RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
+        RC getNextRecord(RID &rid, void *data);
 
-        RC close() { return -1; };
+        RC close() {
+            recordDescriptor.clear();
+            conditionPos = 0;
+            compOp = NO_OP;
+            free(value);
+            value = NULL;
+            attributeNames.clear();
+            conditionAttribute = "";
+            curPage = 0;
+            maxPage = 0;
+            curSlot = 0;
+            return 0;
+        }
+
+        int curPage, maxPage;
+        short curSlot;
+        FileHandle fileHandle;
+        std::vector<Attribute> recordDescriptor;
+        int conditionPos = 0;
+        CompOp compOp = NO_OP;
+        void *value = NULL;
+        std::vector<std::string> attributeNames;
+        std::string conditionAttribute = "";
+
+        void setFileHandle(FileHandle &fileHandle) {
+            RBFM_ScanIterator::fileHandle = fileHandle;
+        }
+
+        void setRecordDescriptor(const std::vector<Attribute> &recordDescriptor) {
+            RBFM_ScanIterator::recordDescriptor = recordDescriptor;
+        }
+
+        void setCompOp(CompOp compOp) {
+            RBFM_ScanIterator::compOp = compOp;
+        }
+
+        void setConditionPos(int conditionPos) {
+            RBFM_ScanIterator::conditionPos = conditionPos;
+        }
+
+        void setValue(const void *value) {
+            AttrType conditionType = RBFM_ScanIterator::recordDescriptor.at(RBFM_ScanIterator::conditionPos).type;
+            if (value == NULL) {
+                RBFM_ScanIterator::value = NULL;
+                return;
+            }
+            if (conditionType == TypeInt) {
+                RBFM_ScanIterator::value = malloc(sizeof(int));
+                memcpy(RBFM_ScanIterator::value, value, sizeof(int));
+            } else if (conditionType == TypeReal) {
+                RBFM_ScanIterator::value = malloc(sizeof(float));
+                memcpy(RBFM_ScanIterator::value, value, sizeof(float));
+            } else if (conditionType == TypeVarChar) {
+                int strLength;
+                memcpy(&strLength, value, sizeof(int));
+                RBFM_ScanIterator::value = malloc(sizeof(int) + strLength);
+                memcpy(RBFM_ScanIterator::value, value, sizeof(int));
+                memcpy((char *) RBFM_ScanIterator::value + sizeof(int), (char *) value + sizeof(int), strLength);
+            }
+        }
+
+        void setAttributeNames(const std::vector<std::string> &attributeNames) {
+            RBFM_ScanIterator::attributeNames = attributeNames;
+        };
+
+        void setConditionAttribute(const std::string conditionName) {
+            RBFM_ScanIterator::conditionAttribute = conditionName;
+        };
+
+
     };
 
     class RecordBasedFileManager {
@@ -138,19 +212,21 @@ namespace PeterDB {
         ~RecordBasedFileManager();                                                  // Prevent unwanted destruction
         RecordBasedFileManager(const RecordBasedFileManager &);                     // Prevent construction by copying
         RecordBasedFileManager &operator=(const RecordBasedFileManager &);          // Prevent assignment
-        PagedFileManager* pagedFileManager;
+        PagedFileManager *pagedFileManager;
 
 
-        void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, char *&record, int &size);
+        void getFieldInfo(const std::vector<Attribute> &vector, const void *pVoid, char *&record, short &size);
 
-        int getSlotTable(char *&page, int &slotCount, int &slotSize);
+        short getSlotTable(char *&page, short &slotCount, short &slotSize);
 
         RC
         insertRecordInNewPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
-                              RID &rid, char *&record, int &recordSize);
+                              RID &rid, char *&record, short &recordSize);
 
         RC insertRecordInOldPage(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, int pageNum,
-                                 RID &rid, char *&record, int &recordSize);
+                                 RID &rid, char *&record, short &recordSize);
+
+        void shiftSlots(short targetOffset, short begin, short end, char *&page);
     };
 
 } // namespace PeterDB

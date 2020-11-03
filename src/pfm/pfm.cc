@@ -20,12 +20,15 @@ namespace PeterDB {
 
     RC PagedFileManager::createFile(const std::string &fileName) {
         //If the file has existed.
-        if (fopen(fileName.c_str(), "r") != NULL) {
+        FILE *file;
+        struct stat buffer;
+        if ((stat(fileName.c_str(), &buffer) == 0)) {
+            //printf("already exist\n");
             return -1;
         } else {
-            FILE *file;
-            file = fopen(fileName.c_str(), "w+b");
+            file = fopen(fileName.c_str(), "w+b");//original: w+b
             if (file == NULL) {
+                printf("null case\n");
                 return -1;
             } else {
                 //If the file has been successfully created,
@@ -62,6 +65,7 @@ namespace PeterDB {
         if (stat(fileName.c_str(), &buffer) == 0) {
             //Initiate the file pointer of FileHandle instance.
             if (fileHandle.initPointer(fileName) == 0) {
+                fileHandle.readPageCounter++;
                 return 0;
             } else { return -1; }
         } else { return -1; }
@@ -88,12 +92,17 @@ namespace PeterDB {
 
     RC FileHandle::readPage(PageNum pageNum, void *data) {
         if (pageNum < 0 || pageNum > numOfPages) {
-            return -1; }
+            return -1;
+        }
+        if (pointer == nullptr) {
+            std::cout << "fileHandle is pointing to nullptr.\n";
+            return -1;
+        }
         fseek(pointer, (pageNum + 1) * PAGE_SIZE, SEEK_SET);
         int result = fread(data, 1, PAGE_SIZE, pointer);
         if (result != PAGE_SIZE) {
-            return -1; }
-        else {
+            return -1;
+        } else {
             readPageCounter++;
             return 0;
         }
@@ -105,6 +114,7 @@ namespace PeterDB {
         int result = fwrite(data, 1, PAGE_SIZE, pointer);
         if (result != PAGE_SIZE) { return -1; }
         else {
+            fflush(pointer);
             writePageCounter++;
             return 0;
         }
@@ -136,7 +146,7 @@ namespace PeterDB {
         //Initiate the file pointer of FileHandle instance.
         if (pointer != NULL) { return -1; }
         else {
-            pointer = fopen(fileName.c_str(), "r+b");
+            pointer = fopen(fileName.c_str(), "r+");//original: r+b
             if (pointer == NULL) { return -1; }
             else {
                 //Read the readPageCounter, writePageCounter, appendPageCounter and page number
@@ -164,7 +174,11 @@ namespace PeterDB {
         fwrite(&writePageCounter, sizeof(unsigned), 1, pointer);
         fwrite(&appendPageCounter, sizeof(unsigned), 1, pointer);
         fwrite(&numOfPages, sizeof(unsigned), 1, pointer);
-        if (fclose(pointer) == 0) { return 0; }
+        fflush(pointer);
+        if (fclose(pointer) == 0) {
+            pointer = NULL;
+            return 0;
+        }
         else { return -1; }
     }
 

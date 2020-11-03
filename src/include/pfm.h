@@ -49,7 +49,6 @@ namespace PeterDB {
 
         RC closePointer();
 
-    private:
         FILE* pointer;
     };
 
