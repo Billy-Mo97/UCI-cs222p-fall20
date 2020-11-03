@@ -1,7 +1,7 @@
 #include "src/include/rm.h"
 #include <map>
 #include <iostream>
-
+#include "math.h"
 namespace PeterDB {
     RelationManager &RelationManager::instance() {
         static RelationManager _relation_manager = RelationManager();
