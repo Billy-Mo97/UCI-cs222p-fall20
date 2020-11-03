@@ -197,11 +197,11 @@ namespace PeterDB {
         if (rbfm.openFile("Tables", fileHandle) == -1) { return -1; }
         //std::cout << "Open \"Tables\" succeed\n";
         if (rbfm.insertRecord(fileHandle, tableAttributeDescriptor, tableData, rid) == -1) { return -1; }
-        std::cout << "Rid of second record in \"Tables\": " << rid.pageNum << ", " << rid.slotNum << std::endl;
+        //std::cout << "Rid of second record in \"Tables\": " << rid.pageNum << ", " << rid.slotNum << std::endl;
         char *printData = (char*) malloc(tableDataSize); memset(printData, 0, tableDataSize);
         rbfm.readRecord(fileHandle, tableAttributeDescriptor, rid, printData);
         rbfm.printRecord(tableAttributeDescriptor, tableData, std::cout);
-        std::cout << "Insert second record into \"Tables\" succeed\n";
+        //std::cout << "Insert second record into \"Tables\" succeed\n";
         free(printData);
         printData = NULL;
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
@@ -234,16 +234,13 @@ namespace PeterDB {
         if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor1, table_ColumnData1, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor2, table_ColumnData2, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor3, table_ColumnData3, rid) == -1) { return -1; }
-        if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor4, table_ColumnData4, rid) == -1) { return -1; }
         //std::cout << "Insert 4 tuples of \"Tables\" succeed.\n";
         free(table_ColumnData1);
         free(table_ColumnData2);
         free(table_ColumnData3);
-        free(table_ColumnData4);
         table_ColumnData1 = NULL;
         table_ColumnData2 = NULL;
         table_ColumnData3 = NULL;
-        table_ColumnData4 = NULL;
 
         //Prepare 6 tuples of "Columns", insert it into "Columns" table.
         int column_ColumnDataSize1, column_ColumnDataSize2, column_ColumnDataSize3, column_ColumnDataSize4,
@@ -283,6 +280,7 @@ namespace PeterDB {
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor4, column_ColumnData4, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor5, column_ColumnData5, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor6, column_ColumnData6, rid) == -1) { return -1; }
+        if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor4, table_ColumnData4, rid) == -1) { return -1; }
         //std::cout << "Insert 6 tuples of \"Columns\" succeed.\n";
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
         free(column_ColumnData1);
@@ -291,12 +289,14 @@ namespace PeterDB {
         free(column_ColumnData4);
         free(column_ColumnData5);
         free(column_ColumnData6);
+        free(table_ColumnData4);
         column_ColumnData1 = NULL;
         column_ColumnData2 = NULL;
         column_ColumnData3 = NULL;
         column_ColumnData4 = NULL;
         column_ColumnData5 = NULL;
         column_ColumnData6 = NULL;
+        table_ColumnData4 = NULL;
         return 0;
     }
 
@@ -304,7 +304,7 @@ namespace PeterDB {
         //Pre-check: check whether catalog tables exists.
         //if(checkCatalog() == -1) { return -1; }
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
-        std::cout << "deleteCatalog is called.\n";
+        //std::cout << "deleteCatalog is called.\n";
         RC r1 = rbfm.destroyFile("Tables") == -1;
         RC r2 = rbfm.destroyFile("Columns") == -1;
         if (r1 == -1 || r2 == -1) { return -1; }
@@ -321,10 +321,10 @@ namespace PeterDB {
         //First, scan the table to find the maximum id
         RM_ScanIterator rmsi;
         std::vector<std::string> tableIdAttr = {"table-id"};
-        std::cout << "Creating table: begin to scan.\n";
+        //std::cout << "Creating table: begin to scan.\n";
         if (scan("Tables", "table-id",
                  NO_OP, NULL, tableIdAttr, rmsi) == -1) { return -1; }
-        std::cout << "Creating table: scan complete.\n";
+        //std::cout << "Creating table: scan complete.\n";
         int nullIndicatorSize = ceil(tableIdAttr.size() / 8.0);
         void *returnedData = malloc(nullIndicatorSize + sizeof(int));
         memset(returnedData, 0, nullIndicatorSize + sizeof(int));
@@ -337,7 +337,7 @@ namespace PeterDB {
             std::cout << "currentId: " << currentId << std::endl;
             maxId = maxId > currentId ? maxId : currentId;
         }
-        std::cout << "maxId: " << maxId << std::endl;
+        //std::cout << "maxId: " << maxId << std::endl;
         rmsi.close();
         free(returnedData);
         returnedData = NULL;
@@ -351,12 +351,12 @@ namespace PeterDB {
         tableData = malloc(tableDataSize); memset(tableData, 0, tableDataSize);
         //Filename is same as tableName, according to piazza post @87
         int tableId = maxId + 1;
-        std::cout << "Creating table: ready to insert into \"Tables\".\n";
+        //std::cout << "Creating table: ready to insert into \"Tables\".\n";
         prepareTableData(tableId, tableName, tableName, User,
                          tableAttributeDescriptor, tableData);
         if (rbfm.insertRecord(fileHandle, tableAttributeDescriptor, tableData, rid) == -1) { return -1; }
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
-        std::cout << "Creating table: successfully insert into \"Tables\".\n";
+        //std::cout << "Creating table: successfully insert into \"Tables\".\n";
         //Finally, for each attribute, insert it into "Columns" table.
         if (rbfm.openFile("Columns", fileHandle) == -1) { return -1; }
 
@@ -368,7 +368,7 @@ namespace PeterDB {
             prepareColumnAttribute(columnAttributeDescriptor, attr.name, columnDataSize);
             columnData = malloc(columnDataSize); memset(columnData, 0, columnDataSize);
             int columnPosition = i + 1;
-            std::cout << "Creating table: ready for " << i << " th attr to insert into \"Columns\".\n";
+            //std::cout << "Creating table: ready for " << i << " th attr to insert into \"Columns\".\n";
             prepareColumnData(tableId, attr.name, attr.type, attr.length, columnPosition,
                               User, columnAttributeDescriptor, columnData);
             if (rbfm.insertRecord(fileHandle, columnAttributeDescriptor, columnData, rid) == -1) {
@@ -407,7 +407,7 @@ namespace PeterDB {
         void *returnedData = malloc(4096); memset(returnedData, 0, 4096);
         RID rid;
         if (rmsi.getNextTuple(rid, returnedData) == RM_EOF) { return -1; }
-        std::cout << "Deleting table: " << tableName << ". Successfully get the tuple.\n";
+        //std::cout << "Deleting table: " << tableName << ". Successfully get the tuple.\n";
         if (rmsi.close() == -1) { return -1; }
         int nullIndicatorSize = ceil(attributeNames.size() / 8.0);
         int dataOffset = nullIndicatorSize;
@@ -433,13 +433,13 @@ namespace PeterDB {
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
 
         //Scan the "Columns" table with the tableId.
-        std::cout << "Deleting table: " << tableName << ". Scanning " << tableId << " in \"Columns\".\n";
+        //std::cout << "Deleting table: " << tableName << ". Scanning " << tableId << " in \"Columns\".\n";
         if (scan("Columns", "table-id",
                  EQ_OP, &tableId, attributeNames, rmsi) == -1) { return -1; }
         returnedData = malloc(4096); memset(returnedData, 0, 4096);
         std::vector<RID> deleteRids;
         while (rmsi.getNextTuple(rid, returnedData) != RM_EOF) {
-            std::cout << "Deleting " << tableName << " , get tableId on " << rid.pageNum << "," << rid.slotNum << std::endl;
+            //std::cout << "Deleting " << tableName << " , get tableId on " << rid.pageNum << "," << rid.slotNum << std::endl;
             deleteRids.push_back(rid);
         }
         if (rmsi.close() == -1) { return -1; }
@@ -503,7 +503,7 @@ namespace PeterDB {
         int dataOffset = nullIndicatorSize;
         memcpy(&tableId, (char *) returnedData + dataOffset, sizeof(int));
         dataOffset += sizeof(int);
-        std::cout << "tableId: " << tableId << std::endl;
+        //std::cout << "tableId: " << tableId << std::endl;
         int fileNameLen;
         memcpy(&fileNameLen, (char *) returnedData + dataOffset, sizeof(int));
         dataOffset += sizeof(int);
@@ -541,11 +541,11 @@ namespace PeterDB {
 
         //This function fetch the attributes from Catalog.
         //First, get the tableId and fileName of the table.
-        std::cout << "Getting attribute starts.\n";
+        //std::cout << "Getting attribute starts.\n";
         int tableId;
         std::string fileName;
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
-        std::cout << "Getting attributes: tableId " << tableId << " filename "<< fileName << std::endl;
+        //std::cout << "Getting attributes: tableId " << tableId << " filename "<< fileName << std::endl;
         //Then, open "Columns" catalogue to find the attributes of the record.
         std::vector<std::string> attributeNames = {"column-name", "column-type", "column-length", "column-position"};
         RM_ScanIterator rmsi;
@@ -557,13 +557,13 @@ namespace PeterDB {
         returnedData = malloc(4096);
         memset(returnedData, 0, 4096);
         while (rmsi.getNextTuple(rid, returnedData) != RM_EOF) {
-            std::cout << "Getting attribute: rid " << rid.pageNum << ", " << rid.slotNum << std::endl;
+            //std::cout << "Getting attribute: rid " << rid.pageNum << ", " << rid.slotNum << std::endl;
             Attribute attr;
             int nullIndicatorSize = ceil(attributeNames.size() / 8.0);
             int dataOffset = nullIndicatorSize;
             int nameLen;
             memcpy(&nameLen, (char *) returnedData + dataOffset, sizeof(int));
-            std::cout << "Getting attribute: get attr name len " << nameLen << std::endl;
+            //std::cout << "Getting attribute: get attr name len " << nameLen << std::endl;
             dataOffset += sizeof(int);
             char *columnName = (char *) malloc(nameLen + 1);
             memset(columnName, 0, nameLen + 1);
@@ -571,7 +571,7 @@ namespace PeterDB {
             memcpy(columnName, (char *) returnedData + dataOffset, nameLen);
             dataOffset += nameLen;
             std::string name(columnName);
-            std::cout << "Getting attribute: get attr name " << name << std::endl;
+            //std::cout << "Getting attribute: get attr name " << name << std::endl;
             free(columnName);
             attr.name = name;
             AttrType type;
@@ -590,13 +590,13 @@ namespace PeterDB {
         }
         free(returnedData);
         returnedData = NULL;
-        std::cout << "Getting attribute: get next tuple complete.\n";
+        //std::cout << "Getting attribute: get next tuple complete.\n";
         if (rmsi.close() == -1) { return -1; }
-        std::cout << "Getting attribute: rmsi closed.\n";
+        //std::cout << "Getting attribute: rmsi closed.\n";
         //Push each attribute into vector
         attrs = std::vector<Attribute>(pos_attr.size());
         for (int i = 0; i < pos_attr.size(); i++) { attrs[i] = pos_attr[i + 1]; }
-        std::cout << "Getting attribute complete.\n";
+        //std::cout << "Getting attribute complete.\n";
         return 0;
     }
 
@@ -698,7 +698,7 @@ namespace PeterDB {
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
         std::vector<Attribute> recordDescriptor;
         if (getAttributes(tableName, recordDescriptor) == -1) { return -1; }
-        std::cout << "Reading attribute: " << "tableId " << tableId << " fileName " << fileName << std::endl;
+        //std::cout << "Reading attribute: " << "tableId " << tableId << " fileName " << fileName << std::endl;
         //Then, delete the record from the table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
@@ -746,14 +746,14 @@ namespace PeterDB {
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
         std::vector<Attribute> recordDescriptor;
         if (getAttributes(tableName, recordDescriptor) == -1) { return -1; }
-        std::cout << "Scanning: get the tableId and fileName from catalog.\n";
+        //std::cout << "Scanning: get the tableId and fileName from catalog.\n";
 
         //Then, scan from the table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
         PeterDB::RBFM_ScanIterator rbfmScanIterator;
         if (rbfm.openFile(fileName, fileHandle) == -1) { return -1; }
-        std::cout << "Scanning: open the table file.\n";
+        //std::cout << "Scanning: open the table file.\n";
         if (rbfm.scan(fileHandle, recordDescriptor, conditionAttribute, compOp,
                       value, attributeNames, rbfmScanIterator) == -1) { return -1; }
         rm_ScanIterator.rbfm_ScanIterator = rbfmScanIterator;
@@ -769,12 +769,12 @@ namespace PeterDB {
     }
 
     RC RM_ScanIterator::close() {
-        std::cout << "Closing RM_ScanIterator.\n";
+        //std::cout << "Closing RM_ScanIterator.\n";
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         if (rbfm_ScanIterator.close() == -1) { return -1; }
-        std::cout << "Closing RM_ScanIterator: RM_ScanIterator closed.\n";
+        //std::cout << "Closing RM_ScanIterator: RM_ScanIterator closed.\n";
         if (rbfm_ScanIterator.fileHandle.pointer != NULL && rbfm.closeFile(rbfm_ScanIterator.fileHandle) == -1) { return -1; }
-        std::cout << "Closing RM_ScanIterator complete.\n";
+        //std::cout << "Closing RM_ScanIterator complete.\n";
         return 0;
     }
 
