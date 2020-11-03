@@ -425,7 +425,7 @@ namespace PeterDB {
                                              const RID &rid, const std::string &attributeName, void *data) {
         char *record = (char *) malloc(PAGE_SIZE); memset(record,0,PAGE_SIZE);
         RC status = readRecord(fileHandle, recordDescriptor, rid, record);
-        printRecord(recordDescriptor, record, std::cout);
+        //printRecord(recordDescriptor, record, std::cout);
         if (status == -1) {
 #ifdef DEBUG
             std::cerr << "Cannot read record when reading attribute." << std::endl;
@@ -474,7 +474,9 @@ namespace PeterDB {
                 if (name == attributeName) {
                     char null = -1;
                     memcpy((char *) data, &null, sizeof(char));
-                    break;
+                    if (nullIndicator != nullptr) free(nullIndicator);
+                    if (record != nullptr) free(record);
+                    return 1;
                 }
             }
         }
@@ -668,10 +670,10 @@ namespace PeterDB {
                             std::string outputAttribute = attributeNames[p];
                             //std::cout << "Getting next record: condition satisfied, fetching attribute " << outputAttribute << std::endl;
                             AttrType type = recordDescriptor.at(output[p]).type;
-                            rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, outputAttribute, outputData);
-                            char null;
-                            memcpy(&null, outputData, sizeof(char));
-                            if (null != -1) {
+                            RC r = rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, outputAttribute, outputData);
+                            //char null;
+                            //memcpy(&null, outputData, sizeof(char));
+                            if (r != 1) {
                                 if (type == TypeInt) {
                                     int readInt;
                                     memcpy(&readInt, outputData, sizeof(int));

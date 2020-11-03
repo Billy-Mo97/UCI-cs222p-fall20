@@ -200,7 +200,7 @@ namespace PeterDB {
         //std::cout << "Rid of second record in \"Tables\": " << rid.pageNum << ", " << rid.slotNum << std::endl;
         char *printData = (char*) malloc(tableDataSize); memset(printData, 0, tableDataSize);
         rbfm.readRecord(fileHandle, tableAttributeDescriptor, rid, printData);
-        rbfm.printRecord(tableAttributeDescriptor, tableData, std::cout);
+        //rbfm.printRecord(tableAttributeDescriptor, tableData, std::cout);
         //std::cout << "Insert second record into \"Tables\" succeed\n";
         free(printData);
         printData = NULL;
@@ -334,7 +334,7 @@ namespace PeterDB {
             int dataOffset = nullIndicatorSize;
             int currentId;
             memcpy(&currentId, (char *) returnedData + dataOffset, sizeof(int));
-            std::cout << "currentId: " << currentId << std::endl;
+            //std::cout << "currentId: " << currentId << std::endl;
             maxId = maxId > currentId ? maxId : currentId;
         }
         //std::cout << "maxId: " << maxId << std::endl;
