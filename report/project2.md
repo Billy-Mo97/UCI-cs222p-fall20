@@ -18,7 +18,10 @@ Columns(table-id:int, column-name:varchar(50), column-type:int, column-length:in
 
 ### 3. Internal Record Format (in case you have changed from P1, please re-enter here)
 - Show your record format design.
-
+1. number of fields (short)
+2. null indicator (ceil(recordDescriptor.size() / 8.0) bits)
+3. offsets of non null fields pointing to the end of each actual field data(shorts)
+4. actual field data
 
 
 - Describe how you store a null field.
@@ -26,7 +29,7 @@ same as P1
 
 
 - Describe how you store a VarChar field.
-
+same as P1
 
 
 - Describe how your record design satisfies O(1) field access.
