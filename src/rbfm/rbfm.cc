@@ -425,7 +425,7 @@ namespace PeterDB {
                                              const RID &rid, const std::string &attributeName, void *data) {
         char *record = (char *) malloc(PAGE_SIZE); memset(record,0,PAGE_SIZE);
         RC status = readRecord(fileHandle, recordDescriptor, rid, record);
-        printRecord(recordDescriptor, record, std::cout);
+        //printRecord(recordDescriptor, record, std::cout);
         if (status == -1) {
 #ifdef DEBUG
             std::cerr << "Cannot read record when reading attribute." << std::endl;
@@ -451,11 +451,11 @@ namespace PeterDB {
                     }
                     offset += sizeof(int);
                 } else if (type == TypeReal) {
-                    float readReal;
+                    int readReal;
                     memcpy(&readReal, (char *) record + offset, sizeof(float));
                     //std::cout << "Reading attribute real: " << readReal << std::endl;
                     if (name == attributeName) {
-                        memcpy((char *) data, &readReal, sizeof(float));
+                        memcpy((char *) data, (char *) record + offset, sizeof(float));
                         break;
                     }
                     offset += sizeof(float);
@@ -660,7 +660,7 @@ namespace PeterDB {
                         }
                         dataSize += nullIndicatorSize;
                         int dataOffset = nullIndicatorSize;
-
+                        //data = malloc(dataSize);
                         memset(data, 0, dataSize);
                         memcpy(data, nullIndicator, nullIndicatorSize);
                         //std::cout << "Getting next record: condition satisfied, ridRead " << ridRead.pageNum
@@ -671,10 +671,8 @@ namespace PeterDB {
                             //std::cout << "Getting next record: condition satisfied, fetching attribute " << outputAttribute << std::endl;
                             AttrType type = recordDescriptor.at(output[p]).type;
                             RC r = rbfm.readAttribute(fileHandle, recordDescriptor, ridRead, outputAttribute, outputData);
-                            /*char null;
-                            memcpy(&null, outputData, sizeof(char));*/
-                            if(r == 1)
-                                //std::cout << "null == -1.\n";
+                            //char null;
+                            //memcpy(&null, outputData, sizeof(char));
                             if (r != 1) {
                                 if (type == TypeInt) {
                                     int readInt;
@@ -683,9 +681,6 @@ namespace PeterDB {
                                     memcpy((char *) data + dataOffset, outputData, sizeof(int));
                                     dataOffset += sizeof(int);
                                 } else if (type == TypeReal) {
-                                    float readReal;
-                                    memcpy(&readReal, outputData, sizeof(float));
-                                    //std::cout << "Getting next record: condition satisfied, fetch " << readReal << std::endl;
                                     memcpy((char *) data + dataOffset, outputData, sizeof(float));
                                     dataOffset += sizeof(float);
                                 } else if (type == TypeVarChar) {

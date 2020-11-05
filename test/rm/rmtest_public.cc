@@ -21,7 +21,7 @@ namespace PeterDBTesting {
 
         // Create Catalog
         ASSERT_EQ(rm.createCatalog(), success) << "Creating the Catalog should succeed.";
-        std::cout << "Create catalog succeed.\n";
+        //std::cout << "Create catalog succeed.\n";
         for (int i = 1; i < 5; i++) {
             tableName = "rm_test_table_" + std::to_string(i);
 
@@ -32,15 +32,15 @@ namespace PeterDBTesting {
             // Create a table
             ASSERT_EQ(rm.createTable(tableName, table_attrs), success)
                                         << "Create table " << tableName << " should succeed.";
-            std::cout << "Create table " << tableName << " succeed.\n";
+            //std::cout << "Create table " << tableName << " succeed.\n";
             ASSERT_TRUE(fileExists(tableName)) << "Table " << tableName << " file should exist now.";
 
         }
-        std::cout << "5 rm_test_tables create succeed.\n";
+        //std::cout << "5 rm_test_tables create succeed.\n";
         for (int i = 1; i < 5; i++) {
             tableName = "rm_test_table_" + std::to_string(i);
             // Delete the table
-            std::cout << "Deleting " << tableName << std::endl;
+            //std::cout << "Deleting " << tableName << std::endl;
             ASSERT_EQ(rm.deleteTable(tableName), success) << "Delete table " << tableName << " should succeed.";
             ASSERT_FALSE(fileExists(tableName)) << "Table " << tableName << " file should not exist now.";
         }
@@ -76,7 +76,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(attrs[3].name, "salary") << "Attribute is not correct.";
         ASSERT_EQ(attrs[3].type, PeterDB::TypeReal) << "Attribute is not correct.";
         ASSERT_EQ(attrs[3].length, 4) << "Attribute is not correct.";
-        std::cout << "get_attributes test succeed.\n";
+        //std::cout << "get_attributes test succeed.\n";
     }
 
     TEST_F(RM_Tuple_Test, insert_and_read_tuple) {
@@ -251,7 +251,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(rm.insertTuple(tableName, inBuffer, rid), success)
                                     << "RelationManager::insertTuple() should succeed.";
 
-        std::cout << "Starting to read attribute.\n";
+        //std::cout << "Starting to read attribute.\n";
         // Test Read Attribute
         ASSERT_EQ(rm.readAttribute(tableName, rid, "salary", outBuffer), success)
                                     << "RelationManager::readAttribute() should succeed.";
@@ -333,7 +333,7 @@ namespace PeterDBTesting {
 
         // GetAttributes
         ASSERT_EQ(rm.getAttributes(tableName, attrs), success) << "RelationManager::getAttributes() should succeed.";
-        std::cout << "getAttributes succeed.\n";
+        //std::cout << "getAttributes succeed.\n";
 
         // Initialize a NULL field indicator
         nullsIndicator = initializeNullFieldsIndicator(attrs);
@@ -347,7 +347,7 @@ namespace PeterDBTesting {
             unsigned age = 20 + i;
             prepareTuple(attrs.size(), nullsIndicator, 6, "Tester", age, height, age * 12.5, inBuffer, tupleSize);
             ages.insert(age);
-            std::cout << "Inserting " << i << " th tuple.\n";
+            //std::cout << "Inserting " << i << " th tuple.\n";
             ASSERT_EQ(rm.insertTuple(tableName, inBuffer, rid), success)
                                         << "RelationManager::insertTuple() should succeed.";
 
