@@ -52,15 +52,15 @@ namespace PeterDBTesting {
         int key = 200;
         rid.pageNum = 500;
         rid.slotNum = 20;
-
+        printf("collectCounter start\n");
         // collect counters
         ASSERT_EQ(ixFileHandle.collectCounterValues(rc, wc, ac), success)
                                     << "indexManager::collectCounterValues() should succeed.";
-
+        printf("collectCounter complete\n");
         // insert entry
         ASSERT_EQ(ix.insertEntry(ixFileHandle, ageAttr, &key, rid), success)
                                     << "indexManager::insertEntry() should succeed.";
-
+        printf("insertEntry complete\n");
         // collect counters
         ASSERT_EQ(ixFileHandle.collectCounterValues(rcAfter, wcAfter, acAfter), success)
                                     << "indexManager::collectCounterValues() should succeed.";

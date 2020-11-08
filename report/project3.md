@@ -26,11 +26,26 @@
 
 ### 4. Page Format
 - Show your internal-page (non-leaf node) design.
-
-
+left to right:
+1.nodeType(char)
+2.nodeSize(short)
+3.nodeParentPageNum(int)
+4.entries
+right to left:
+1.entryCount(short)
+2.slot offsets(shorts)
 
 - Show your leaf-page (leaf node) design.
-
+left to right:
+1.nodeType(char)
+2.nodeSize(short)
+3.nodeParentPageNum(int)
+4.rightPointer
+5.overflowPointer
+6.entries
+right to left:
+1.entryCount(short)
+2.slot offsets(shorts)
 
 
 ### 5. Describe the following operation logic.
