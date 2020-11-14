@@ -43,7 +43,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(IX_Test, insert_one_entry_and_print) {
+    /*TEST_F(IX_Test, insert_one_entry_and_print) {
         // Functions tested
         // 1. Insert one entry
         // 2. Disk I/O check of Insertion - CollectCounterValues
@@ -865,6 +865,6 @@ namespace PeterDBTesting {
 
         validateTree(stream, 12, 12, 1, 2);
 
-    }
+    }*/
 
 } // namespace PeterDBTesting
