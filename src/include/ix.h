@@ -176,7 +176,7 @@ namespace PeterDB {
 
         InternalNode();
 
-        ~InternalNode() override;
+        ~InternalNode();
     };
 
     class LeafNode : public Node {
@@ -187,7 +187,7 @@ namespace PeterDB {
 
         LeafNode();
 
-        ~LeafNode() override;
+        ~LeafNode();
     };
 
     class BTree {
@@ -204,6 +204,30 @@ namespace PeterDB {
         RC generateRootNode(LeafNode* res, const LeafEntry &pair);
 
         RC initiateNullTree(IXFileHandle &ixFileHandle, const LeafEntry &pair);
+
+        RC insertEntryInLeafNode(Node *targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair);
+
+        RC writeLeafNodeToFile(IXFileHandle &ixFileHandle, Node *targetNode);
+
+        RC setMidToSplit(Node *targetNode, int &mid);
+
+        RC createNewSplitLeafNode(LeafNode *newNode, LeafNode *targetNode, int &mid);
+
+        RC splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *targetNode, LeafNode *newNode);
+
+        RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode);
+
+        RC updateInternalNode(InternalNode *updateNode, InternalEntry &insertEntry);
+
+        RC updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode, InternalNode *parent);
+
+        RC writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *parent);
+
+        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newInternalNode);
+
+        RC createParentForSplitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newNode);
+
+        RC updateParentOfInternal(IXFileHandle &ixFileHandle, Node *targetNode, InternalNode *newNode, InternalNode *parent);
 
         RC insertEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair);
 

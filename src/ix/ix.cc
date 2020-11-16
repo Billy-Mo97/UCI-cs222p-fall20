@@ -29,7 +29,8 @@ namespace PeterDB {
                 //root, minLeaf and attrType to -1.
                 //write them to the hidden page of the file (first page).
                 unsigned readNum = 0, writeNum = 0, appendNum = 0, pageNum = 0;
-                int root = -1, minLeaf = -1, nullAttr = -1;
+                int root = NULLNODE, minLeaf = NULLNODE;
+                AttrType nullAttr = TypeNull;
                 fseek(file, 0, SEEK_SET);
                 fwrite(&readNum, sizeof(unsigned), 1, file);
                 fwrite(&writeNum, sizeof(unsigned), 1, file);
@@ -37,7 +38,7 @@ namespace PeterDB {
                 fwrite(&pageNum, sizeof(unsigned), 1, file);
                 fwrite(&root, sizeof(int), 1, file);
                 fwrite(&minLeaf, sizeof(int), 1, file);
-                fwrite(&nullAttr, sizeof(int), 1, file);
+                fwrite(&nullAttr, sizeof(AttrType), 1, file);
                 //Write end mark into the hidden page.
                 unsigned end = 0;
                 fseek(file, PAGE_SIZE - sizeof(unsigned), SEEK_SET);
@@ -126,12 +127,12 @@ namespace PeterDB {
         //If the index is not null, initiate the bTree accordingly.
         //Otherwise, set the root and minLeaf to -1.
         PeterDB::PagedFileManager &pfm = PeterDB::PagedFileManager::instance();
-        if (pfm.openFile(fileName, ixFileHandle.fileHandle) == -1) return -1;
+        if (pfm.openFile(fileName, ixFileHandle.fileHandle) == -1) { return -1; }
         if (ixFileHandle.readHiddenPage() == -1) return -1;
         if (ixFileHandle.root != NULLNODE) {
             char *rootPage = (char *) calloc(PAGE_SIZE, 1);
-            if(ixFileHandle.readPage(ixFileHandle.root, rootPage) == -1) { return -1; }
-            if(ixFileHandle.bTree->generateNode(rootPage, ixFileHandle.bTree->root) == -1) { return -1; }
+            if (ixFileHandle.readPage(ixFileHandle.root, rootPage) == -1) { return -1; }
+            if (ixFileHandle.bTree->generateNode(rootPage, ixFileHandle.bTree->root) == -1) { return -1; }
             ixFileHandle.bTree->root->pageNum = ixFileHandle.root;
             free(rootPage);
             ixFileHandle.bTree->nodeMap[ixFileHandle.root] = ixFileHandle.bTree->root;
@@ -139,8 +140,8 @@ namespace PeterDB {
         if (ixFileHandle.minLeaf == NULLNODE) ixFileHandle.minLeaf = ixFileHandle.root;
         else {
             char *minPage = (char *) calloc(PAGE_SIZE, 1);
-            if(ixFileHandle.readPage(ixFileHandle.minLeaf, minPage) == -1) { return -1; }
-            if(ixFileHandle.bTree->generateNode(minPage, ixFileHandle.bTree->minLeaf) == -1) { return -1; }
+            if (ixFileHandle.readPage(ixFileHandle.minLeaf, minPage) == -1) { return -1; }
+            if (ixFileHandle.bTree->generateNode(minPage, ixFileHandle.bTree->minLeaf) == -1) { return -1; }
             ixFileHandle.bTree->minLeaf->pageNum = ixFileHandle.minLeaf;
             free(minPage);
             ixFileHandle.bTree->nodeMap[ixFileHandle.minLeaf] = ixFileHandle.bTree->minLeaf;
@@ -192,7 +193,31 @@ namespace PeterDB {
     RC
     IndexManager::insertEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid) {
         LeafEntry leafEntry(attribute.type, key, rid);
-        return ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry);
+        if (ixFileHandle.bTree) {
+            return ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry);
+        } else {
+            ixFileHandle.bTree = new BTree();
+            ixFileHandle.bTree->attrType = attribute.type;
+            if (ixFileHandle.root != NULLNODE) {
+                char *rootPage = (char *) calloc(PAGE_SIZE, 1);
+                if (ixFileHandle.readPage(ixFileHandle.root, rootPage) == -1) { return -1;}
+                if (ixFileHandle.bTree->generateNode(rootPage, ixFileHandle.bTree->root) == -1) { return -1; }
+                ixFileHandle.bTree->root->pageNum = ixFileHandle.root;
+                free(rootPage);
+                ixFileHandle.bTree->nodeMap[ixFileHandle.root] = ixFileHandle.bTree->root;
+            }
+            if (ixFileHandle.minLeaf == NULLNODE) { ixFileHandle.minLeaf = ixFileHandle.root; }
+            else {
+                char *minPage = (char *) calloc(PAGE_SIZE, 1);
+                if (ixFileHandle.readPage(ixFileHandle.minLeaf, minPage) == -1) { return -1; }
+                if (ixFileHandle.bTree->generateNode(minPage,  ixFileHandle.bTree->minLeaf) == -1) { return -1; }
+                ixFileHandle.bTree->minLeaf->pageNum = ixFileHandle.minLeaf;
+                free(minPage);
+                ixFileHandle.bTree->nodeMap[ixFileHandle.minLeaf] = ixFileHandle.bTree->minLeaf;
+            }
+            return ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry);
+        }
+        return 0;
     }
 
     RC
@@ -236,7 +261,7 @@ namespace PeterDB {
         //Starting from the first entry in the node, print out the keys and rids.
         for (int i = 0; i <= dynamic_cast<LeafNode *>(node)->leafEntries.size(); i++) {
             if (i == dynamic_cast<LeafNode *>(node)->leafEntries.size()) {
-                if(printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
+                if (printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
             } else {
                 //"start" marks the beginning of a new key, we iterate until we find a different key.
                 //Then, we print out the key, and all rids having this key.
@@ -244,7 +269,7 @@ namespace PeterDB {
                     0)
                     continue;
                 else {
-                    if(printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
+                    if (printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
                     start = i;
                     entry = dynamic_cast<LeafNode *>(node)->leafEntries[i];
                     if (i == dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",";
@@ -292,7 +317,7 @@ namespace PeterDB {
         out << "[";
         //If current node is a leaf node, print it.
         if (node->type == LEAF) {
-            if(leafDFS(ixFileHandle, node, attribute, out) == -1) { return -1; }
+            if (leafDFS(ixFileHandle, node, attribute, out) == -1) { return -1; }
             out << "]";
         } else {
             //If current node is a internal node,
@@ -304,11 +329,13 @@ namespace PeterDB {
             out << "\"children\":[";
             for (int i = 0; i < dynamic_cast<InternalNode *>(node)->internalEntries.size(); i++) {
                 //For each internal node's entry, do DFS search on its left child.
-                if(DFS(ixFileHandle, dynamic_cast<InternalNode *>(node)->internalEntries[i].left, attribute, out) == -1) { return -1; }
+                if (DFS(ixFileHandle, dynamic_cast<InternalNode *>(node)->internalEntries[i].left, attribute, out) ==
+                    -1) { return -1; }
                 out << ",";
                 //If it is the last entry on its node, do DFS search on its right child.
                 if (i == dynamic_cast<InternalNode *>(node)->internalEntries.size() - 1) {
-                    if(DFS(ixFileHandle, dynamic_cast<InternalNode *>(node)->internalEntries[i].right, attribute, out) == -1) { return -1; }
+                    if (DFS(ixFileHandle, dynamic_cast<InternalNode *>(node)->internalEntries[i].right, attribute,
+                            out) == -1) { return -1; }
                 }
             }
             out << "]";
@@ -344,7 +371,8 @@ namespace PeterDB {
     }
 
     RC
-    IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) const {
+    IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount,
+                                       unsigned &appendPageCount) const {
         readPageCount = ixReadPageCounter;
         writePageCount = ixWritePageCounter;
         appendPageCount = ixAppendPageCounter;
@@ -400,7 +428,7 @@ namespace PeterDB {
             //set entry offset
             memcpy(page + PAGE_SIZE - (i + 2) * sizeof(short), &offset, sizeof(short));
             //set key
-            if(setInternalEntryKeyInPage(node, page, offset, i) == -1) { return -1; }
+            if (setInternalEntryKeyInPage(node, page, offset, i) == -1) { return -1; }
             //If entry is the last, write its right child.
             if (i == slotCount - 1) {
                 int rightPage = dynamic_cast<InternalNode *>(node)->internalEntries[i].right->pageNum;
@@ -477,13 +505,13 @@ namespace PeterDB {
         if (node == nullptr) return -1;
         char *page = (char *) calloc(PAGE_SIZE, 1);
         short offset = 0;
-        if(generatePageHeader(node, page, offset) == -1) { return -1; }
+        if (generatePageHeader(node, page, offset) == -1) { return -1; }
         if (node->type == INTERNAL) {
-            if(generateInternalPage(node, page, offset) == -1) {
+            if (generateInternalPage(node, page, offset) == -1) {
                 return -1;
             }
         } else if (node->type == LEAF) {
-            if(generateLeafPage(node, page, offset) == -1) {
+            if (generateLeafPage(node, page, offset) == -1) {
                 return -1;
             }
         }
@@ -556,10 +584,10 @@ namespace PeterDB {
             short slotOffset;
             memcpy(&slotOffset, data + PAGE_SIZE - (i + 2) * sizeof(short), sizeof(short));
             short keyLen = 0;
-            if(getKeyLen(data, offset, keyLen) == -1) { return -1; }
+            if (getKeyLen(data, offset, keyLen) == -1) { return -1; }
             InternalEntry entry(attrType, data + slotOffset);
-            if(getLeftInternalEntry(entry, data, slotOffset) == -1) { return -1; }
-            if(getRightInternalEntry(entry, data, offset, keyLen) == -1) { return -1; }
+            if (getLeftInternalEntry(entry, data, slotOffset) == -1) { return -1; }
+            if (getRightInternalEntry(entry, data, offset, keyLen) == -1) { return -1; }
             dynamic_cast<InternalNode *>(res)->internalEntries.push_back(entry);
         }
         return 0;
@@ -606,7 +634,7 @@ namespace PeterDB {
             short slotOffset;
             memcpy(&slotOffset, data + PAGE_SIZE - (i + 2) * sizeof(short), sizeof(short));
             short keyLen = 0;
-            if(getKeyLen(data, offset, keyLen) == -1) { return -1; }
+            if (getKeyLen(data, offset, keyLen) == -1) { return -1; }
             RID rid;
             memcpy(&rid.pageNum, data + slotOffset + keyLen, sizeof(PageNum));
             memcpy(&rid.slotNum, data + slotOffset + keyLen + sizeof(PageNum), sizeof(short));
@@ -620,11 +648,11 @@ namespace PeterDB {
         //This is a helper function to initialize following information of leaf node:
         //right pointer, overflow pointer, entries vector in this node.
 
-        if(getRightPointerInLeafNode(res, data, offset) == -1) { return -1; }
+        if (getRightPointerInLeafNode(res, data, offset) == -1) { return -1; }
 
-        if(getOverflowPointerInLeafNode(res, data, offset) == -1) { return -1; }
+        if (getOverflowPointerInLeafNode(res, data, offset) == -1) { return -1; }
 
-        if(getEntriesInLeafNode(res, data, offset, slotCount) == -1) { return -1; }
+        if (getEntriesInLeafNode(res, data, offset, slotCount) == -1) { return -1; }
 
         return 0;
     }
@@ -636,11 +664,11 @@ namespace PeterDB {
         //data pointer is pre-loaded with the data of Node in index file.
         res = new Node();
         short offset, slotCount;
-        if(generateNodeHeader(res, data, offset, slotCount) == -1) { return -1; }
+        if (generateNodeHeader(res, data, offset, slotCount) == -1) { return -1; }
         if (res->type == INTERNAL) {
-            if(generateInternalNode(res, data, offset, slotCount) == -1) { return -1; }
+            if (generateInternalNode(res, data, offset, slotCount) == -1) { return -1; }
         } else if (res->type == LEAF) {
-            if(generateLeafNode(res, data, offset, slotCount) == -1) { return -1; }
+            if (generateLeafNode(res, data, offset, slotCount) == -1) { return -1; }
         }
         return 0;
     }
@@ -660,7 +688,7 @@ namespace PeterDB {
                 return -1;
             }
             delete node;
-            if(generateNode(pageData, node) == -1) { return -1; }
+            if (generateNode(pageData, node) == -1) { return -1; }
             node->pageNum = pageNum;
             nodeMap[pageNum] = node;
             free(pageData);
@@ -702,7 +730,8 @@ namespace PeterDB {
                     loadNode(ixFileHandle, node);
                 }
             } else {
-                if (idm.compareKey(attrType, dynamic_cast<InternalNode *>(node)->internalEntries[i].key, pair.key) < 0) {
+                if (idm.compareKey(attrType, dynamic_cast<InternalNode *>(node)->internalEntries[i].key, pair.key) <
+                    0) {
                     ixFileHandle.ixReadPageCounter++;
                     node = dynamic_cast<InternalNode *>(node)->internalEntries[i].left;
                     if (dynamic_cast<InternalNode *>(node)->isLoaded == false) {
@@ -717,7 +746,7 @@ namespace PeterDB {
 
     RC BTree::findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node) {
         while (node->type != LEAF) {
-            if(compareKeyInInternalNode(ixFileHandle, pair, node) == 1) {
+            if (compareKeyInInternalNode(ixFileHandle, pair, node) == 1) {
                 break;
             }
         }
@@ -728,8 +757,8 @@ namespace PeterDB {
         //This is a helper function that creates root node with one leaf entry.
         //These information is stored in node class in memory.
         res->leafEntries.push_back(pair);
-        //This one leaf entry takes up keySize + directory space (short) in page.
-        res->sizeInPage += pair.keySize + sizeof(short);
+        //This one leaf entry takes up keySize + RID + directory space (short) in page.
+        res->sizeInPage += pair.keySize + sizeof(RID) + sizeof(short);
         res->isLoaded = true;
         return 0;
     }
@@ -741,14 +770,14 @@ namespace PeterDB {
         //Set the B+ Tree parameters.
         //Create a new page with the new node and write it into the index file.
         LeafNode *node = new LeafNode();
-        if(generateRootNode(node, pair) == -1) { return -1; }
+        if (generateRootNode(node, pair) == -1) { return -1; }
         //set tree
         root = node;
         minLeaf = node;
         //generate the page and write it into index file.
         char *new_page = (char *) calloc(PAGE_SIZE, 1);
-        if(generatePage(node, new_page) == -1) { return -1; }
-        if(ixFileHandle.appendPage(new_page) == -1) { return -1; }
+        if (generatePage(node, new_page) == -1) { return -1; }
+        if (ixFileHandle.appendPage(new_page) == -1) { return -1; }
         free(new_page);
         nodeMap[0] = node;
         node->pageNum = 0;
@@ -758,309 +787,375 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::insertEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair) {
-        //This is a helper function to insert pair entry into B+ Tree.
+    RC BTree::insertEntryInLeafNode(Node *targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair) {
+        //This is a helper function that insert pair entry into B+ Tree's leaf node.
 
-        //If current B+ Tree is empty, initiate it.
-        if (root == nullptr) {
-            if(initiateNullTree(ixFileHandle, pair) == -1) { return -1; }
-        } else {
-            Node *targetNode = root;
-            if(findLeafNode(ixFileHandle, pair, targetNode) == -1) { return -1; };     //find the inserted leaf node
-            if (dynamic_cast<LeafNode *>(targetNode)->isLoaded == false) {
-                loadNode(ixFileHandle, targetNode);
+        //Find the inserted leaf node, load it into memory if it hasn't been loaded.
+        targetNode = root;
+        if (findLeafNode(ixFileHandle, pair, targetNode) == -1) { return -1; };
+        if (dynamic_cast<LeafNode *>(targetNode)->isLoaded == false) {
+            loadNode(ixFileHandle, targetNode);
+        }
+
+        //Insert the entry into targetNode
+        bool isAdded = false;
+        //If we find pair's key less than one entry's key, insert it before that entry.
+        for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
+             i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++) {
+            if (PeterDB::IndexManager::instance().compareKey(attrType, pair.key, (*i).key) < 0) {
+                dynamic_cast<LeafNode *>(targetNode)->leafEntries.insert(i, pair);
+                isAdded = true;
+                break;
             }
-            //insert the entry into targetNode
-            bool isAdded = false;
-            for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
-                 i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++) {
-                if (PeterDB::IndexManager::instance().compareKey(attrType, pair.key, (*i).key) < 0) {
-                    dynamic_cast<LeafNode *>(targetNode)->leafEntries.insert(i, pair);
-                    isAdded = true;
+        }
+        //Otherwise, push it to the back of vector of entries.
+        if (isAdded == false) {
+            dynamic_cast<LeafNode *>(targetNode)->leafEntries.push_back(pair);
+        }
+
+        //This newly inserted entry takes up keySize + RID + directory space (short) in page.
+        dynamic_cast<LeafNode *>(targetNode)->sizeInPage += pair.keySize + sizeof(RID) + sizeof(short);
+        return 0;
+    }
+
+    RC BTree::writeLeafNodeToFile(IXFileHandle &ixFileHandle, Node *targetNode) {
+        //write the updated target node into file
+        char *newPage = (char *) calloc(PAGE_SIZE, 1);
+        generatePage(targetNode, newPage);
+        if (ixFileHandle.writePage(dynamic_cast<LeafNode *>(targetNode)->pageNum, newPage) == -1) { return -1; }
+        free(newPage);
+        return 0;
+    }
+
+    RC BTree::setMidToSplit(Node *targetNode, int &mid) {
+        //This is helper function to set the mid point in the target leaf node.
+        //The mid point is set to include all the entries around mid point with same key before or after mid point.
+        PeterDB::IndexManager &idm = PeterDB::IndexManager::instance();
+        int entriesNum = dynamic_cast<LeafNode *>(targetNode)->leafEntries.size();
+        mid = entriesNum / 2;
+        int end = 0;
+        //Search towards end.
+        for (int i = mid; i <= entriesNum; i++) {
+            if (i == entriesNum) {
+                end = 1;
+                break;
+            }
+            LeafEntry curEntry = dynamic_cast<LeafNode *>(targetNode)->leafEntries[i],
+                    prevEntry = dynamic_cast<LeafNode *>(targetNode)->leafEntries[i - 1];
+            if (idm.compareKey(attrType, curEntry.key, prevEntry.key) == 0)
+                continue;
+            else {
+                mid = i;
+                break;
+            }
+        }
+        if (end == 1) {
+            //Search towards front.
+            for (int i = mid; i >= 0; i--) {
+                //All keys are the same, we can't find a reasonable point to split this node.
+                if (i == 0) { return -1; }
+                LeafEntry curEntry = dynamic_cast<LeafNode *>(targetNode)->leafEntries[i],
+                        prevEntry = dynamic_cast<LeafNode *>(targetNode)->leafEntries[i - 1];
+                if (idm.compareKey(attrType, curEntry.key, prevEntry.key) == 0)
+                    continue;
+                else {
+                    mid = i;
                     break;
-                }
-            }
-            if (isAdded == false) {
-                dynamic_cast<LeafNode *>(targetNode)->leafEntries.push_back(pair);
-            }
-            dynamic_cast<LeafNode *>(targetNode)->sizeInPage += entryLen + sizeof(short);
-            if (dynamic_cast<LeafNode *>(targetNode)->sizeInPage <= PAGE_SIZE) {   //insert into targetNode
-                //write the updated target node into file
-                char *newPage = (char *) calloc(PAGE_SIZE, 1);
-                generatePage(targetNode, newPage);
-                ixFileHandle.writePage(dynamic_cast<LeafNode *>(targetNode)->pageNum, newPage);
-                free(newPage);
-                return 0;
-            } else {//split leaf node;
-                LeafNode *newNode = new LeafNode();
-                newNode->isLoaded = true;
-                //entry too large
-                if (dynamic_cast<LeafNode *>(targetNode)->leafEntries.size() <= 1) return -1;
-                //start from mid, find same keys, put them into the same node
-                int mid = dynamic_cast<LeafNode *>(targetNode)->leafEntries.size() / 2;
-                int end = 0;
-                //search towards end
-                for (int i = mid; i <= dynamic_cast<LeafNode *>(targetNode)->leafEntries.size(); i++) {
-                    if (i == dynamic_cast<LeafNode *>(targetNode)->leafEntries.size()) {
-                        end = 1;
-                        break;
-                    }
-                    if (PeterDB::IndexManager::instance().compareKey(attrType,
-                                                                     dynamic_cast<LeafNode *>(targetNode)->leafEntries[i].key,
-                                                                     dynamic_cast<LeafNode *>(targetNode)->leafEntries[
-                                                                             i - 1].key) == 0)
-                        continue;
-                    else {
-                        mid = i;
-                        break;
-                    }
-                }
-                if (end == 1) {
-                    //search towards front
-                    for (int i = mid; i >= 0; i--) {
-                        if (i == 0) return -1;//all keys are the same, can't split
-                        if (PeterDB::IndexManager::instance().compareKey(attrType,
-                                                                         dynamic_cast<LeafNode *>(targetNode)->leafEntries[i].key,
-                                                                         dynamic_cast<LeafNode *>(targetNode)->leafEntries[
-                                                                                 i - 1].key) == 0)
-                            continue;
-                        else {
-                            mid = i;
-                            break;
-                        }
-                    }
-                }
-                //split node and update size
-                for (int i = mid; i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.size(); i++) {
-                    LeafEntry leafEntry(attrType, dynamic_cast<LeafNode *>(targetNode)->leafEntries[i].key,
-                                        dynamic_cast<LeafNode *>(targetNode)->leafEntries[i].rid);
-                    dynamic_cast<LeafNode *>(newNode)->leafEntries.push_back(leafEntry);
-                    int strLen = 0;
-                    if (attrType == TypeVarChar) {
-                        memcpy(&strLen, (char *) dynamic_cast<LeafNode *>(targetNode)->leafEntries[i].key, 4);
-                    }
-                    dynamic_cast<LeafNode *>(targetNode)->sizeInPage -=
-                            strLen + sizeof(short) + sizeof(int) + sizeof(PageNum) + sizeof(short);
-                    newNode->sizeInPage += strLen + sizeof(short) + sizeof(int) + sizeof(PageNum) + sizeof(short);
-                }
-
-                for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin() + mid;
-                     i != dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++)
-                    free(i->key);
-                dynamic_cast<LeafNode *>(targetNode)->leafEntries.erase(
-                        dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin() + mid,
-                        dynamic_cast<LeafNode *>(targetNode)->leafEntries.end());
-                //update rightPointer
-                newNode->rightPointer = dynamic_cast<LeafNode *>(targetNode)->rightPointer;
-                dynamic_cast<LeafNode *>(targetNode)->rightPointer = newNode;
-                //write updated targetNode to file
-                char *updatedTargetPage = (char *) calloc(PAGE_SIZE, 1);
-                generatePage(targetNode, updatedTargetPage);
-                ixFileHandle.writePage(dynamic_cast<LeafNode *>(targetNode)->pageNum, updatedTargetPage);
-                free(updatedTargetPage);
-                //write new leaf node to file
-                char *newLeafPage = (char *) calloc(PAGE_SIZE, 1);
-                generatePage(newNode, newLeafPage);
-                ixFileHandle.appendPage(newLeafPage);
-                nodeMap[ixFileHandle.ixAppendPageCounter - 1] = newNode;
-                newNode->pageNum = ixFileHandle.ixAppendPageCounter - 1;
-                free(newLeafPage);
-                //if no parent node, create one
-                if (dynamic_cast<LeafNode *>(targetNode)->parent == NULL) {
-                    InternalNode *parent = new InternalNode();
-                    parent->isLoaded = true;
-                    InternalEntry internal_pair(attrType, newNode->leafEntries[0].key, targetNode, newNode);
-                    parent->internalEntries.push_back(internal_pair);
-                    parent->type = INTERNAL;
-                    int strLen = 0;
-                    if (attrType == TypeVarChar) {
-                        memcpy(&strLen, (char *) dynamic_cast<LeafNode *>(newNode)->leafEntries[0].key, sizeof(int));
-                    }
-                    parent->sizeInPage += strLen + sizeof(int) + sizeof(short);
-                    //write parent node to file
-                    char *parentPage = (char *) calloc(PAGE_SIZE, 1);
-                    generatePage(parent, parentPage);
-                    ixFileHandle.appendPage(parentPage);
-                    free(parentPage);
-                    nodeMap[ixFileHandle.ixAppendPageCounter - 1] = parent;
-                    parent->pageNum = ixFileHandle.ixAppendPageCounter - 1;
-                    //set parent
-                    dynamic_cast<LeafNode *>(targetNode)->parent = parent;
-                    newNode->parent = parent;
-                    //set meta fields
-                    ixFileHandle.root = ixFileHandle.ixAppendPageCounter - 1;
-                    root = parent;
-                    return 0;
-                } else {  // it has parent node
-                    Node *parent = dynamic_cast<LeafNode *>(targetNode)->parent;
-                    PageNum parentPageNum = dynamic_cast<LeafNode *>(targetNode)->parent->pageNum;
-                    InternalEntry internal_pair(attrType, dynamic_cast<LeafNode *>(newNode)->leafEntries[0].key,
-                                                targetNode, newNode);
-                    //add entry to internal node
-                    bool isInternalAdded = false;
-                    int addedIndex = 0;
-                    for (auto i = dynamic_cast<InternalNode *>(parent)->internalEntries.begin();
-                         i != dynamic_cast<InternalNode *>(parent)->internalEntries.end(); i++) {
-                        if (PeterDB::IndexManager::instance().compareKey(attrType, internal_pair.key, (*i).key) < 0) {
-                            dynamic_cast<InternalNode *>(parent)->internalEntries.insert(i, internal_pair);
-                            isInternalAdded = true;
-                            addedIndex = i - dynamic_cast<InternalNode *>(parent)->internalEntries.begin();
-                            break;
-                        }
-                    }
-                    int strLen = 0;
-                    if (attrType == TypeVarChar) {
-                        memcpy(&strLen, (char *) dynamic_cast<LeafNode *>(newNode)->leafEntries[0].key, sizeof(int));
-                    }
-                    if (isInternalAdded == false) {
-                        dynamic_cast<InternalNode *>(parent)->internalEntries.push_back(internal_pair);
-                        dynamic_cast<InternalNode *>(parent)->internalEntries[
-                                dynamic_cast<InternalNode *>(parent)->internalEntries.size() -
-                                2].right = internal_pair.left;
-                        dynamic_cast<InternalNode *>(parent)->sizeInPage +=
-                                strLen + 2 * sizeof(int) + sizeof(short);//pointer+key+offset
-                    } else if (addedIndex == 0) {
-                        dynamic_cast<InternalNode *>(parent)->internalEntries[1].left = internal_pair.right;
-                        dynamic_cast<InternalNode *>(parent)->sizeInPage += strLen + 2 * sizeof(int) + sizeof(short);
-                    } else {
-                        dynamic_cast<InternalNode *>(parent)->internalEntries[addedIndex -
-                                                                              1].right = internal_pair.left;
-                        dynamic_cast<InternalNode *>(parent)->internalEntries[addedIndex +
-                                                                              1].left = internal_pair.right;
-                        dynamic_cast<InternalNode *>(parent)->sizeInPage += strLen + 2 * sizeof(int) + sizeof(short);
-                    }
-                    if (dynamic_cast<InternalNode *>(parent)->sizeInPage <= PAGE_SIZE) {
-                        char *updatedParentPage = (char *) calloc(PAGE_SIZE, 1);
-                        generatePage(parent, updatedParentPage);
-                        ixFileHandle.writePage(dynamic_cast<InternalNode *>(parent)->pageNum, updatedParentPage);
-                        free(updatedParentPage);
-                        return 0;
-                    }
-                    while (dynamic_cast<InternalNode *>(parent)->sizeInPage > PAGE_SIZE) {   //continuously split parent node
-                        Node *newInternal = new InternalNode();
-                        newInternal->isLoaded = true;
-                        newInternal->sizeInPage += sizeof(int);//right pointer
-                        //move half of entries and update size
-                        for (int i = dynamic_cast<InternalNode *>(parent)->internalEntries.size() / 2 + 1;
-                             i < dynamic_cast<InternalNode *>(parent)->internalEntries.size(); i++) {
-                            InternalEntry internalEntry(attrType,
-                                                        dynamic_cast<InternalNode *>(parent)->internalEntries[i].key,
-                                                        dynamic_cast<InternalNode *>(parent)->internalEntries[i].left,
-                                                        dynamic_cast<InternalNode *>(parent)->internalEntries[i].right);
-                            dynamic_cast<InternalNode *>(newInternal)->internalEntries.push_back(internalEntry);
-                            int strLen = 0;
-                            if (attrType == TypeVarChar) {
-                                memcpy(&strLen, (char *) dynamic_cast<InternalNode *>(parent)->internalEntries[i].key,
-                                       4);
-                            }//key, offset, left pointer
-                            dynamic_cast<InternalNode *>(parent)->sizeInPage -=
-                                    sizeof(int) + strLen + sizeof(short) + sizeof(int);
-                            dynamic_cast<InternalNode *>(newInternal)->sizeInPage +=
-                                    sizeof(int) + strLen + sizeof(short) + sizeof(int);
-                        }
-                        //delete half of parent node
-                        for (auto i = dynamic_cast<InternalNode *>(parent)->internalEntries.begin() + mid;
-                             i != dynamic_cast<InternalNode *>(parent)->internalEntries.end(); i++)
-                            free(i->key);
-                        dynamic_cast<InternalNode *>(parent)->internalEntries.erase(
-                                dynamic_cast<InternalNode *>(parent)->internalEntries.begin() + mid,
-                                dynamic_cast<InternalNode *>(parent)->internalEntries.end());
-                        //write updated parent to file
-                        char *updatedParentPage = (char *) calloc(PAGE_SIZE, 1);
-                        generatePage(parent, updatedParentPage);
-                        ixFileHandle.writePage(dynamic_cast<InternalNode *>(parent)->pageNum, updatedParentPage);
-                        free(updatedParentPage);
-                        //write new internal node to file
-                        char *newInternalPage = (char *) calloc(PAGE_SIZE, 1);
-                        generatePage(newInternal, newInternalPage);
-                        ixFileHandle.appendPage(newInternalPage);
-                        nodeMap[ixFileHandle.ixAppendPageCounter - 1] = newInternal;
-                        newInternal->pageNum = ixFileHandle.ixAppendPageCounter - 1;
-                        free(newInternalPage);
-                        if (dynamic_cast<InternalNode *>(parent)->parent == NULL) {
-                            InternalNode *rootParent = new InternalNode();
-                            rootParent->isLoaded = true;
-                            InternalEntry rootEntry(attrType,
-                                                    dynamic_cast<InternalNode *>(newInternal)->internalEntries[0].key,
-                                                    parent, newInternal);
-                            rootParent->internalEntries.push_back(rootEntry);
-                            int strLen = 0;
-                            if (attrType == TypeVarChar) {
-                                memcpy(&strLen,
-                                       (char *) dynamic_cast<InternalNode *>(newInternal)->internalEntries[0].key,
-                                       sizeof(int));
-                            }
-                            rootParent->sizeInPage += strLen + sizeof(int) + sizeof(short);
-                            //write root node to file
-                            char *rootPage = (char *) calloc(PAGE_SIZE, 1);
-                            generatePage(rootParent, rootPage);
-                            ixFileHandle.appendPage(rootPage);
-                            free(rootPage);
-                            nodeMap[ixFileHandle.ixAppendPageCounter - 1] = rootParent;
-                            rootParent->pageNum = ixFileHandle.ixAppendPageCounter - 1;
-                            //set parent
-                            dynamic_cast<InternalNode *>(parent)->parent = rootParent;
-                            newInternal->parent = rootParent;
-                            //set meta fields
-                            ixFileHandle.root = ixFileHandle.ixAppendPageCounter - 1;
-                            root = rootParent;
-                            return 0;
-                        } else {  // it has parent
-                            Node *newParent = dynamic_cast<InternalNode *>(parent)->parent;
-                            PageNum newParentPageNum = dynamic_cast<InternalNode *>(parent)->parent->pageNum;
-                            InternalEntry new_internal_pair(attrType,
-                                                            dynamic_cast<InternalNode *>(newInternal)->internalEntries[0].key,
-                                                            parent, newInternal);
-                            //add entry to internal node
-                            bool isInternalAdded = false;
-                            int addedIndex = 0;
-                            for (auto i = dynamic_cast<InternalNode *>(newParent)->internalEntries.begin();
-                                 i != dynamic_cast<InternalNode *>(newParent)->internalEntries.end(); i++) {
-                                if (PeterDB::IndexManager::instance().compareKey(attrType, internal_pair.key,
-                                                                                 (*i).key) < 0) {
-                                    dynamic_cast<InternalNode *>(newParent)->internalEntries.insert(i, internal_pair);
-                                    isInternalAdded = true;
-                                    addedIndex = i - dynamic_cast<InternalNode *>(newParent)->internalEntries.begin();
-                                    break;
-                                }
-                            }
-                            int strLen = 0;
-                            if (attrType == TypeVarChar) {
-                                memcpy(&strLen,
-                                       (char *) dynamic_cast<InternalNode *>(newInternal)->internalEntries[0].key,
-                                       sizeof(int));
-                            }
-                            if (isInternalAdded == false) {
-                                dynamic_cast<InternalNode *>(newParent)->internalEntries.push_back(new_internal_pair);
-                                dynamic_cast<InternalNode *>(newParent)->internalEntries[
-                                        dynamic_cast<InternalNode *>(newParent)->internalEntries.size() -
-                                        2].right = new_internal_pair.left;
-                                dynamic_cast<InternalNode *>(newParent)->sizeInPage +=
-                                        strLen + 2 * sizeof(int) + sizeof(short); //left pointer + key + offset
-                            } else if (addedIndex == 0) {
-                                dynamic_cast<InternalNode *>(newParent)->internalEntries[1].left = new_internal_pair.right;
-                                dynamic_cast<InternalNode *>(newParent)->sizeInPage +=
-                                        strLen + 2 * sizeof(int) + sizeof(short);
-                            } else {
-                                dynamic_cast<InternalNode *>(newParent)->internalEntries[addedIndex -
-                                                                                         1].right = new_internal_pair.left;
-                                dynamic_cast<InternalNode *>(newParent)->internalEntries[addedIndex +
-                                                                                         1].left = new_internal_pair.right;
-                                dynamic_cast<InternalNode *>(newParent)->sizeInPage +=
-                                        strLen + 2 * sizeof(int) + sizeof(short);
-                            }
-                            parent = newParent;
-                        }
-                    }
                 }
             }
         }
         return 0;
     }
 
-    Node::Node() = default;
+    RC BTree::createNewSplitLeafNode(LeafNode *newNode, LeafNode *targetNode, int &mid) {
+        //Split node, push the entries into new node and update size
+        for (int i = mid; i < targetNode->leafEntries.size(); i++) {
+            LeafEntry leafEntry(attrType, targetNode->leafEntries[i].key, targetNode->leafEntries[i].rid);
+            newNode->leafEntries.push_back(leafEntry);
+            int entrySizeInPage = leafEntry.keySize + sizeof(RID) + sizeof(short);
+            targetNode->sizeInPage -= entrySizeInPage;
+            newNode->sizeInPage += entrySizeInPage;
+        }
 
-    Node::~Node() noexcept = default;
+        //Delete the moved entries from old node.
+        targetNode->leafEntries.erase(targetNode->leafEntries.begin() + mid, targetNode->leafEntries.end());
+
+        //Update rightPointer of new node and old node.
+        newNode->rightPointer = targetNode->rightPointer;
+        targetNode->rightPointer = newNode;
+
+        return 0;
+    }
+
+    RC BTree::splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *targetNode, LeafNode *newNode) {
+        //This is a helper function to split leaf node, write both old and new node to index file.
+        newNode = new LeafNode();
+        newNode->isLoaded = true;
+
+        //There is only one entry in leaf node, we can't split one single entry.
+        if (targetNode->leafEntries.size() <= 1) { return -1; }
+
+        //Find the correct mid point for leaf node to split.
+        int mid;
+        if (setMidToSplit(targetNode, mid) == 0) { return -1; }
+
+        if (createNewSplitLeafNode(newNode, targetNode, mid) == 0) { return -1; }
+
+        //Write updated targetNode to file
+        char *updatedTargetPage = (char *) calloc(PAGE_SIZE, 1);
+        generatePage(targetNode, updatedTargetPage);
+        ixFileHandle.writePage(targetNode->pageNum, updatedTargetPage);
+        free(updatedTargetPage);
+
+        //Write new leaf node to file
+        char *newLeafPage = (char *) calloc(PAGE_SIZE, 1);
+        if (generatePage(newNode, newLeafPage) == -1) { return -1; };
+        if (ixFileHandle.appendPage(newLeafPage) == -1) { return -1; };
+        PageNum newPageNum = nodeMap.size();
+        nodeMap[newPageNum] = newNode;
+        newNode->pageNum = newPageNum;
+        free(newLeafPage);
+
+        return 0;
+    }
+
+    RC BTree::createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode) {
+        //This is a helper function that creates a parent node for split leaf node.
+        //It insert the first entry of new split node into the parent node, set the parameters of the parent node,
+        //generate its page and writes it into index file.
+        InternalNode *parent = new InternalNode();
+        parent->isLoaded = true;
+        InternalEntry internal_pair(attrType, newNode->leafEntries[0].key, targetNode, newNode);
+        parent->internalEntries.push_back(internal_pair);
+        parent->type = INTERNAL;
+        int entrySizeInPage = newNode->leafEntries[0].keySize + sizeof(RID) + sizeof(short);
+        parent->sizeInPage += entrySizeInPage;
+
+        //Write parent node to file
+        char *parentPage = (char *) calloc(PAGE_SIZE, 1);
+        if (generatePage(parent, parentPage) == -1) { return -1; }
+        if (ixFileHandle.appendPage(parentPage) == -1) { return -1; };
+        free(parentPage);
+
+        //set parent node in B+ Tree.
+        PageNum parentPageNum = nodeMap.size();
+        nodeMap[parentPageNum] = parent;
+        parent->pageNum = parentPageNum;
+        dynamic_cast<LeafNode *>(targetNode)->parent = parent;
+        newNode->parent = parent;
+        //set meta fields
+        ixFileHandle.root = parentPageNum;
+        root = parent;
+
+        return 0;
+    }
+
+    RC BTree::updateInternalNode(InternalNode *updateNode, InternalEntry &insertEntry) {
+        //This is a helper function to update internal node in B+ Tree by inserting new entry into this node.
+        PeterDB::IndexManager &idm = PeterDB::IndexManager::instance();
+        bool isAdded = false;
+        int addedIndex = 0;
+        for (auto i = updateNode->internalEntries.begin();
+             i != updateNode->internalEntries.end(); i++) {
+            if (idm.compareKey(attrType, insertEntry.key, (*i).key) < 0) {
+                updateNode->internalEntries.insert(i, insertEntry);
+                isAdded = true;
+                addedIndex = i - updateNode->internalEntries.begin();
+                break;
+            }
+        }
+
+        //If the entry is to be inserted to the back of vector.
+        if (isAdded == false) {
+            updateNode->internalEntries.push_back(insertEntry);
+            updateNode->internalEntries[updateNode->internalEntries.size() - 2].right = insertEntry.left;
+            //This newly inserted entry takes up keySize + left pointer + directory space (short) in page.
+            int entrySizeInPage = insertEntry.keySize + sizeof(PageNum) + sizeof(short);
+            updateNode->sizeInPage += entrySizeInPage;
+        } else if (addedIndex == 0) { //Or the entry is to be inserted to the beginning of vector.
+            updateNode->internalEntries[1].left = insertEntry.right;
+            //This newly inserted entry takes up keySize + left pointer + directory space (short) in page.
+            int entrySizeInPage = insertEntry.keySize + sizeof(PageNum) + sizeof(short);
+            updateNode->sizeInPage += entrySizeInPage;
+        } else {//Or it is inserted at middle of the vector
+            updateNode->internalEntries[addedIndex - 1].right = insertEntry.left;
+            updateNode->internalEntries[addedIndex + 1].left = insertEntry.right;
+            //This newly inserted entry takes up keySize + left pointer + directory space (short) in page.
+            int entrySizeInPage = insertEntry.keySize + sizeof(PageNum) + sizeof(short);
+            updateNode->sizeInPage += entrySizeInPage;
+        }
+
+        return 0;
+    }
+
+    RC
+    BTree::updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode, InternalNode *parent) {
+        parent = dynamic_cast<InternalNode *>(dynamic_cast<LeafNode *>(targetNode)->parent);
+        PageNum parentPageNum = targetNode->parent->pageNum;
+        InternalEntry insertEntry(attrType, newNode->leafEntries[0].key, targetNode, newNode);
+
+        if (updateInternalNode(parent, insertEntry) == -1) { return -1; }
+
+        return 0;
+    }
+
+    RC BTree::writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *parent) {
+        char *updatedParentPage = (char *) calloc(PAGE_SIZE, 1);
+        generatePage(parent, updatedParentPage);
+        if (ixFileHandle.writePage(dynamic_cast<InternalNode *>(parent)->pageNum, updatedParentPage) ==
+            -1) { return -1; }
+        free(updatedParentPage);
+        return 0;
+    }
+
+    RC BTree::splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newInternalNode) {
+        //This is a helper function to split internal node, write both old and new node to index file.
+        newInternalNode = new InternalNode();
+        newInternalNode->isLoaded = true;
+        newInternalNode->sizeInPage += sizeof(PageNum); //Size for right pointer
+        //Move half of entries in old node and update size
+        int internalEntryNum = targetNode->internalEntries.size();
+        for (int i = internalEntryNum / 2 + 1; i < internalEntryNum; i++) {
+            InternalEntry moveEntry = targetNode->internalEntries[i];
+            InternalEntry internalEntry(attrType, moveEntry.key, moveEntry.left, moveEntry.right);
+            newInternalNode->internalEntries.push_back(internalEntry);
+            //This moved entry takes up keySize + left pointer + directory space (short) in page.
+            int entrySizeInPage = internalEntry.keySize + sizeof(PageNum) + sizeof(short);
+            targetNode->sizeInPage -= entrySizeInPage;
+            newInternalNode->sizeInPage += entrySizeInPage;
+        }
+
+        //Delete the moved entries old node
+        targetNode->internalEntries.erase(targetNode->internalEntries.begin() + internalEntryNum / 2 + 1,
+                                          targetNode->internalEntries.end());
+
+        //write updated parent to file
+        char *updatedParentPage = (char *) calloc(PAGE_SIZE, 1);
+        if (generatePage(targetNode, updatedParentPage) == -1) { return -1; }
+        if (ixFileHandle.writePage(targetNode->pageNum, updatedParentPage) == -1) { return -1; }
+        free(updatedParentPage);
+
+        //write new internal node to file
+        char *newInternalPage = (char *) calloc(PAGE_SIZE, 1);
+        if (generatePage(newInternalNode, newInternalPage) == -1) { return -1; }
+        if (ixFileHandle.appendPage(newInternalPage) == -1) { return -1; }
+        PageNum newPageNum = nodeMap.size();
+        nodeMap[newPageNum] = newInternalNode;
+        newInternalNode->pageNum = newPageNum;
+        free(newInternalPage);
+
+        return 0;
+    }
+
+    RC BTree::createParentForSplitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode,
+                                               InternalNode *newNode) {
+        InternalNode *rootParent = new InternalNode();
+        rootParent->isLoaded = true;
+        rootParent->sizeInPage += sizeof(PageNum); //Size for right pointer.
+
+        InternalEntry rootEntry(attrType, newNode->internalEntries[0].key, targetNode, newNode);
+        rootParent->internalEntries.push_back(rootEntry);
+        //This newly inserted entry takes up keySize + left pointer + directory space (short) in page.
+        int entrySizeInPage = newNode->internalEntries[0].keySize + sizeof(PageNum) + sizeof(short);
+        rootParent->sizeInPage += entrySizeInPage;
+
+        //write root node to file
+        char *rootPage = (char *) calloc(PAGE_SIZE, 1);
+        if (generatePage(rootParent, rootPage) == -1) { return -1; }
+        if (ixFileHandle.appendPage(rootPage) == -1) { return -1; }
+        free(rootPage);
+
+        PageNum newPageNum = nodeMap.size();
+        nodeMap[newPageNum] = rootParent;
+        rootParent->pageNum = newPageNum;
+        //set parent
+        targetNode->parent = rootParent;
+        newNode->parent = rootParent;
+        //set meta fields
+        ixFileHandle.root = newPageNum;
+        root = rootParent;
+
+        return 0;
+    }
+
+    RC BTree::updateParentOfInternal(IXFileHandle &ixFileHandle, Node *targetNode, InternalNode *newNode,
+                                     InternalNode *parent) {
+        parent = dynamic_cast<InternalNode *>(dynamic_cast<InternalNode *>(targetNode)->parent);
+        PageNum parentPageNum = targetNode->parent->pageNum;
+        InternalEntry insertEntry(attrType, newNode->internalEntries[0].key, targetNode, newNode);
+
+        if (updateInternalNode(parent, insertEntry) == -1) { return -1; }
+
+        return 0;
+    }
+
+    RC BTree::insertEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair) {
+        //This is a helper function to insert pair entry into B+ Tree.
+
+        //If current B+ Tree is empty, initiate it with pair entry.
+        if (root == nullptr) {
+            return initiateNullTree(ixFileHandle, pair);
+        } else {
+            Node *targetNode;
+            if (insertEntryInLeafNode(targetNode, ixFileHandle, pair) == -1) { return -1; }
+            //If the inserted leaf node does not exceed space of one page,
+            //generate a new page with this node and insert it into index file.
+            if (dynamic_cast<LeafNode *>(targetNode)->sizeInPage <= PAGE_SIZE) {
+                return writeLeafNodeToFile(ixFileHandle, targetNode);
+            } else { //Otherwise, split the leaf node, generate a new page with split node and write it into index file.
+                LeafNode *newNode;
+                if (splitLeafNode(ixFileHandle, dynamic_cast<LeafNode *>(targetNode), newNode) == -1) { return -1; }
+
+                //If there is no parent for old node, create one and return.
+                if (dynamic_cast<LeafNode *>(targetNode)->parent == nullptr) {
+                    return createParentForSplitLeafNode(ixFileHandle, targetNode, newNode);
+                } else {  // If it has a parent node.
+                    InternalNode *parent;
+                    if (updateParentOfLeaf(ixFileHandle, targetNode, newNode, parent) == -1) { return -1; }
+                    if (dynamic_cast<InternalNode *>(parent)->sizeInPage <= PAGE_SIZE) {
+                        return writeParentNodeToFile(ixFileHandle, parent);
+                    }
+                    while (dynamic_cast<InternalNode *>(parent)->sizeInPage >
+                           PAGE_SIZE) {   //continuously split parent node
+                        InternalNode *newInternalNode;
+                        if (splitInternalNode(ixFileHandle, parent, newInternalNode) == -1) { return -1; }
+                        //If parent node does not have any parent, which means it is root node,
+                        //create a new root
+                        if (dynamic_cast<InternalNode *>(parent)->parent == nullptr) {
+                            return createParentForSplitInternalNode(ixFileHandle, parent, newInternalNode);
+                        } else {  // it has parent
+                            InternalNode *newParent;
+                            if (updateParentOfInternal(ixFileHandle, parent, newInternalNode, newParent) ==
+                                -1) { return -1; }
+                            parent = newParent;
+                        }
+                    }
+                    return writeParentNodeToFile(ixFileHandle, parent);
+                }
+            }
+        }
+        return 0;
+    }
+
+    Node::Node() {
+        type = TypeNull;
+        //sizeInPage consists of type(char), sizeInPage(short), parent(PageNum).
+        sizeInPage = sizeof(char) + sizeof(short) + sizeof(PageNum);
+        parent = nullptr;
+        pageNum = -1;
+        isDirty = false;
+        isLoaded = false;
+    }
+
+    Node::~Node() {
+        type = TypeNull;
+        //sizeInPage consists of type(char), sizeInPage(short), parent(PageNum).
+        sizeInPage = sizeof(char) + sizeof(short) + sizeof(PageNum);
+        parent = nullptr;
+        pageNum = -1;
+        isDirty = false;
+        isLoaded = false;
+    }
 
     BTree::BTree() {
         root = nullptr;
@@ -1068,14 +1163,33 @@ namespace PeterDB {
         attrType = TypeNull;
     }
 
-    BTree::~BTree() {};
+    BTree::~BTree() {
+        root = nullptr;
+        minLeaf = nullptr;
+        attrType = TypeNull;
+        nodeMap.clear();
+    };
 
-    LeafNode::~LeafNode() {};
+    LeafNode::~LeafNode() {
+        leafEntries.clear();
+        //Set sizeInPage back to initial value
+        sizeInPage = sizeof(char) + sizeof(short) + 3 * sizeof(PageNum) + sizeof(short);
+        parent = nullptr;
+        pageNum = -1;
+        isDirty = false;
+        isLoaded = false;
+        rightPointer = nullptr;
+        overflowPointer = nullptr;
+    }
 
     InternalNode::~InternalNode() {
-        for (auto i:internalEntries) {
-
-        }
+        internalEntries.clear();
+        //Set sizeInPage back to initial value
+        sizeInPage = sizeof(char) + sizeof(short) + sizeof(PageNum) + sizeof(short);
+        parent = nullptr;
+        pageNum = -1;
+        isDirty = false;
+        isLoaded = false;
     }
 
     InternalNode::InternalNode() {
@@ -1125,12 +1239,19 @@ namespace PeterDB {
         this->rid = ridPassed;
     }
 
-    LeafEntry::~LeafEntry() = default;
+    LeafEntry::~LeafEntry() {
+        free(key);
+        key = nullptr;
+        rid.pageNum = -1;
+        rid.slotNum = -1;
+        keySize = 0;
+    };
 
     InternalEntry::InternalEntry() {
         key = nullptr;
         left = nullptr;
         right = nullptr;
+        keySize = 0;
     }
 
     InternalEntry::InternalEntry(const AttrType &attribute, const void *key, Node *left, Node *right) {
@@ -1158,10 +1279,12 @@ namespace PeterDB {
         if (attrType == TypeInt) {
             this->key = malloc(sizeof(int));
             keySize = sizeof(int);
+            this->key = malloc(sizeof(int));
             memcpy(this->key, key, sizeof(int));
         } else if (attrType == TypeReal) {
             this->key = malloc(sizeof(float));
             keySize = sizeof(float);
+            this->key = malloc(sizeof(float));
             memcpy(this->key, key, sizeof(float));
         } else if (attrType == TypeVarChar) {
             int strLen = *(int *) key;
@@ -1173,5 +1296,11 @@ namespace PeterDB {
         this->right = nullptr;
     }
 
-    InternalEntry::~InternalEntry() {}
+    InternalEntry::~InternalEntry() {
+        free(key);
+        key = nullptr;
+        left = nullptr;
+        right = nullptr;
+        keySize = 0;
+    }
 } // namespace PeterDB
