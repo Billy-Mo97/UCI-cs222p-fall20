@@ -39,6 +39,12 @@ namespace PeterDB {
         // Close an ixFileHandle for an index.
         RC closeFile(IXFileHandle &ixFileHandle);
 
+        // Set root of B+ Tree.
+        RC setRoot(IXFileHandle &ixFileHandle);
+
+        // Set minLeaf of B+ Tree.
+        RC setMinLeaf(IXFileHandle &ixFileHandle);
+
         // Insert an entry into the given index that is indicated by the given ixFileHandle.
         RC insertEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid);
 
@@ -114,6 +120,8 @@ namespace PeterDB {
 
         RC readHiddenPage();
 
+        RC readRootPage();
+
         RC writeHiddenPage();
 
         RC readPage(PageNum pageNum, void *data);
@@ -121,6 +129,10 @@ namespace PeterDB {
         RC writePage(PageNum pageNum, const void *data);
 
         RC appendPage(const void *data);
+
+        RC appendRootPage(const Attribute &attribute);
+
+        RC writeRootPage();
     };
 
     class Node {

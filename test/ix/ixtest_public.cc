@@ -69,7 +69,7 @@ namespace PeterDBTesting {
         EXPECT_IN_RANGE(rcAfter - rc, 0, 1); // could read the tree root pointer
         EXPECT_IN_RANGE(wcAfter - wc, 0,
                         2); // could write to both tree root pointer and first tree node, depends on the implementation
-        EXPECT_EQ(acAfter - ac, 1); // one for tree root pointer, one for the first tree node
+        EXPECT_EQ(acAfter - ac, 2); // one for tree root pointer, one for the first tree node
 
         EXPECT_GE(getFileSize(indexFileName) / PAGE_SIZE, 2) << "File size should get increased.";
         EXPECT_EQ(getFileSize(indexFileName) % PAGE_SIZE, 0) << "File should be based on PAGE_SIZE.";
