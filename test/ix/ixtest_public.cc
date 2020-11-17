@@ -14,7 +14,7 @@ namespace PeterDBTesting {
 
         // create index file
         ASSERT_EQ(ix.createFile(indexFileName), success) << "indexManager::createFile() should succeed.";
-
+        std::cout << "Create succeed.\n";
         // open index file
         ASSERT_EQ(ix.openFile(indexFileName, ixFileHandle), success) << "indexManager::openFile() should succeed.";
         ASSERT_TRUE(fileExists(indexFileName)) << "The index file " << indexFileName << " should exist now.";
@@ -41,7 +41,7 @@ namespace PeterDBTesting {
                                     << "indexManager::destroyFile() on a non-existence index file should not succeed.";
         ASSERT_FALSE(fileExists(indexFileName)) << "The index file " << indexFileName << " should not exist now.";
 
-    }*/
+    }
 
     TEST_F(IX_Test, insert_one_entry_and_print) {
         // Functions tested
@@ -81,9 +81,9 @@ namespace PeterDBTesting {
 
         validateTree(stream, 1, 1, 0, PAGE_SIZE / 10 / 2, true);
 
-    }
+    }*/
 
-    /*TEST_F(IX_Test, insert_one_entry_and_scan) {
+    TEST_F(IX_Test, insert_one_entry_and_scan) {
         // Functions tested
         // 1. Insert one entry
         // 2. Disk I/O check of Scan - NO_OP and getNextEntry
@@ -96,6 +96,12 @@ namespace PeterDBTesting {
         // Insert one entry
         ASSERT_EQ(ix.insertEntry(ixFileHandle, ageAttr, &key, rid), success)
                                     << "indexManager::insertEntry() should succeed.";
+
+
+        /*char *data = (char *) malloc(PAGE_SIZE);
+        ixFileHandle.readPage(1, data);
+        short entryCount;
+        memcpy(&entryCount, data + PAGE_SIZE - sizeof(short), sizeof(short));*/
 
         // collect counters
         ASSERT_EQ(ixFileHandle.collectCounterValues(rc, wc, ac), success)
@@ -136,7 +142,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
     }
 
-    TEST_F(IX_Test, insert_and_delete_one_entry) {
+    /*TEST_F(IX_Test, insert_and_delete_one_entry) {
         // Functions tested
         // 1. Insert one entry
         // 2. Disk I/O check of deleteEntry - CollectCounterValues

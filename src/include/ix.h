@@ -51,6 +51,18 @@ namespace PeterDB {
         // Delete an entry from the given index that is indicated by the given ixFileHandle.
         RC deleteEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid);
 
+        // Find the inclusive start entry of scanning in given leaf node.
+        RC findInclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool startFound);
+
+        // Find the exclusive start entry of scanning in given leaf node.
+        RC findExclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool startFound);
+
+        // Find the inclusive end entry of scanning in given leaf node.
+        RC findInclusiveEndEntry(AttrType type, const void *highKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool endFound);
+
+        // Find the inclusive end entry of scanning in given leaf node.
+        RC findExclusiveEndEntry(AttrType type, const void *highKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool endFound);
+
         // Initialize and IX_ScanIterator to support a range search
         RC scan(IXFileHandle &ixFileHandle,
                 const Attribute &attribute,
@@ -81,12 +93,34 @@ namespace PeterDB {
 
     class IX_ScanIterator {
     public:
+        AttrType type;
+        void *lowKey;
+        void *highKey;
+        bool lowKeyInclusive;
+        bool highKeyInclusive;
+        PageNum startPageNum = -1;
+        int startEntryIndex = -1;
+        PageNum curPageNum = -1;
+        int curEntryIndex = -1;
+        FileHandle fileHandle;
+
+        // Interface
+        RC setValues(const void *lowKey, const void *highKey, bool lowKeyInclusive, bool highKeyInclusive, FileHandle fileHandle);
 
         // Constructor
         IX_ScanIterator();
 
         // Destructor
         ~IX_ScanIterator();
+
+        // Get header information from leaf page in index file;
+        RC getLeafHeaderFromPage(char* pageData, char nodeType, short nodeSize, int nodeParentPageNum, PageNum rightPageNum, PageNum overflowPageNum);
+
+        // Get the key length of entry.
+        RC getKeyLen(char *pageData, short &offset, short &keyLen);
+
+        // Get leaf entry from leaf page in index file.
+        RC getLeafEntryFromPage(char* pageData, PageNum rightPageNum, short entryCount, RID &rid, void *key);
 
         // Get next matching entry
         RC getNextEntry(RID &rid, void *key);
@@ -280,6 +314,8 @@ namespace PeterDB {
         RC generateLeafNode(Node *res, char *data, short &offset, short &slotCount);
 
         RC generateNode(char *data, Node* res);
+
+        RC getMaxLeaf(LeafNode *maxLeafNode);
         //int compareKey(void* v1, void* v2);
 //        RC deleteEntry(IXFileHandle &ixfileHandle, const LeafEntry &pair);
 //        RC findRecord(IXFileHandle &ixfileHandle, const LeafEntry &pair, std::vector<LeafEntry>::iterator &result);
