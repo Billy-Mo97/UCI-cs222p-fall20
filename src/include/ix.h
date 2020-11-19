@@ -283,9 +283,9 @@ namespace PeterDB {
 
         RC loadNode(IXFileHandle &ixFileHandle, Node *&node);
 
-        int compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node);
+        int compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node*node);
 
-        RC findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *curNode);
+        RC findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node*curNode);
 
         static RC generatePageHeader(Node *node, char *page, short &offset);
 
@@ -321,7 +321,7 @@ namespace PeterDB {
 
         RC getMaxLeaf(LeafNode *maxLeafNode);
         //int compareKey(void* v1, void* v2);
-//        RC deleteEntry(IXFileHandle &ixfileHandle, const LeafEntry &pair);
+        RC deleteEntry(IXFileHandle &ixfileHandle, const LeafEntry &pair);
 //        RC findRecord(IXFileHandle &ixfileHandle, const LeafEntry &pair, std::vector<LeafEntry>::iterator &result);
 //        RC findLeaf(IXFileHandle &ixfileHandle, const LeafEntry &pair, LeafNode** &result);
 

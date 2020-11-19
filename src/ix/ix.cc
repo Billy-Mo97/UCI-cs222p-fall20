@@ -344,14 +344,50 @@ namespace PeterDB {
             }
             if (ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry) == -1) { return -1; }
         }
-        //if (ixFileHandle.writeRootPointerPage() == -1) { return -1; }
-        //appendNum = ixFileHandle.ixAppendPageCounter;
         return 0;
     }
-
+    RC BTree::deleteEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair){
+        Node* targetNode = root;
+        ixFileHandle.ixReadPageCounter++;
+        if (findLeafNode(ixFileHandle, pair, targetNode) == -1) { return -1; };
+        if (dynamic_cast<LeafNode *>(targetNode)->isLoaded == false) {
+            if (loadNode(ixFileHandle, targetNode) == -1) { return -1; }
+        }
+        //If we find pair, delete it
+        for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
+             i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++) {
+            if (PeterDB::IndexManager::instance().compareKey(attrType, pair.key, (*i).key) == 0) {
+                if(pair.rid.pageNum == (*i).rid.pageNum && pair.rid.slotNum == (*i).rid.slotNum){
+                    dynamic_cast<LeafNode *>(targetNode)->leafEntries.erase(i);
+                    dynamic_cast<LeafNode *>(targetNode)->sizeInPage -= pair.keySize + sizeof(RID) + sizeof(short);
+                    writeLeafNodeToFile(ixFileHandle, targetNode);
+                    return 0;
+                }
+            }
+        }
+        return -1;
+    }
     RC
     IndexManager::deleteEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid) {
-        return -1;
+        //printf("start deleteEntry\n");
+        if (getRootAndMinLeaf(ixFileHandle) == -1) { return -1; }
+        //if (getMinLeaf(ixFileHandle) == -1) { return -1; }
+        LeafEntry leafEntry(attribute.type, key, rid);
+        if (ixFileHandle.bTree) {
+            ixFileHandle.bTree->attrType = attribute.type;
+            if (ixFileHandle.bTree->deleteEntry(ixFileHandle, leafEntry) == -1) { return -1; }
+        } else {
+            ixFileHandle.bTree = new BTree();
+            ixFileHandle.bTree->attrType = attribute.type;
+            //If root is null, append a new root page.
+            if (ixFileHandle.root == NULLNODE) {
+                return -1;
+            } else {
+                if (setRoot(ixFileHandle) == -1) { return -1; }
+            }
+            if (ixFileHandle.bTree->deleteEntry(ixFileHandle, leafEntry) == -1) { return -1; }
+        }
+        return 0;
     }
 
     RC IndexManager::printLeafKey(int start, int i, Node *node, const Attribute &attribute, std::ostream &out) {
@@ -387,6 +423,7 @@ namespace PeterDB {
         //This is a helper function to print out all the keys and rids in a leaf node.
         int start = 0;
         int entrySize = dynamic_cast<LeafNode *>(node)->leafEntries.size();
+        if(entrySize == 0) return 0;
         LeafEntry entry = dynamic_cast<LeafNode *>(node)->leafEntries[0];
         //Starting from the first entry in the node, print out the keys and rids.
         for (int i = 0; i <= dynamic_cast<LeafNode *>(node)->leafEntries.size(); i++) {
@@ -1086,7 +1123,7 @@ namespace PeterDB {
         return 0;
     }
 
-    int BTree::compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node) {
+    int BTree::compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node*node) {//add reference
         //This is a helper function to compare key in internal node.
         //If it finds pair's value less than any entry's key in given internal node, it loads the entry's left child, and returns 1.
         //Otherwise, it loads the last entry's right child, and returns 0.
@@ -1114,7 +1151,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node) {
+    RC BTree::findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node) {//add reference
         while (node->type != LEAF) {
             if (compareKeyInInternalNode(ixFileHandle, pair, node) == 1) {
                 break;
