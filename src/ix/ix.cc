@@ -29,8 +29,6 @@ namespace PeterDB {
                 //root, minLeaf and attrType to -1.
                 //write them to the hidden page of the file (first page).
                 unsigned readNum = 0, writeNum = 0, appendNum = 0, pageNum = 0;
-                int root = NULLNODE, minLeaf = NULLNODE;
-                AttrType nullAttr = TypeNull;
                 fseek(file, 0, SEEK_SET);
                 fwrite(&readNum, sizeof(unsigned), 1, file);
                 fwrite(&writeNum, sizeof(unsigned), 1, file);
@@ -40,6 +38,18 @@ namespace PeterDB {
                 unsigned end = 0;
                 fseek(file, PAGE_SIZE - sizeof(unsigned), SEEK_SET);
                 fwrite(&end, sizeof(unsigned), 1, file);
+
+                /*//Write root page.
+                int root = -1, minLeaf = -1;
+                AttrType nullType = TypeNull;
+                fseek(file, PAGE_SIZE, SEEK_SET);
+                fwrite(&root, sizeof(int), 1, file);
+                fwrite(&minLeaf, sizeof(int), 1, file);
+                fwrite(&nullType, sizeof(AttrType), 1, file);
+                //Write end mark into the hidden page.
+                fseek(file, 2 * PAGE_SIZE - sizeof(unsigned), SEEK_SET);
+                fwrite(&end, sizeof(unsigned), 1, file);*/
+
                 fclose(file);
                 return 0;
             }
@@ -54,7 +64,7 @@ namespace PeterDB {
     RC IXFileHandle::readHiddenPage() {
         //Read the hidden page of the file,
         //initiate corresponding parameters in IXFileHandle class.
-        if (!fileHandle.pointer) return -1;
+        if (!fileHandle.pointer) { return -1; }
         fseek(fileHandle.pointer, 0, SEEK_SET);
         char *data = (char *) malloc(PAGE_SIZE);
         size_t readSize = fread(data, 1, PAGE_SIZE, fileHandle.pointer);
@@ -77,23 +87,31 @@ namespace PeterDB {
         offset += sizeof(unsigned);
         //If numOfPages is greater than 0, there is a root page, read it.
         if (numOfPages > 0) {
-            if (readRootPage() == -1) { return -1; }
+            if (readRootPointerPage() == -1) { return -1; }
         }
         free(data);
         return 0;
     }
 
-    RC IXFileHandle::readRootPage() {
+    RC IXFileHandle::readRootPointerPage() {
         char *data = (char *) malloc(PAGE_SIZE);
-        if (readPage(0, data) == -1) { return -1; }
+        if (readPage(0, data) == -1) {
+            free(data);
+            return -1;
+        }
         short offset = 0;
         memcpy(&root, data + offset, sizeof(int));
         offset += sizeof(int);
         memcpy(&minLeaf, data + offset, sizeof(int));
         offset += sizeof(int);
-        bTree = new BTree();
-        memcpy(&bTree->attrType, data + offset, sizeof(AttrType));
+        AttrType type;
+        memcpy(&type, data + offset, sizeof(AttrType));
         offset += sizeof(AttrType);
+        if (type != TypeNull && bTree == nullptr) {
+            bTree = new BTree();
+            bTree->attrType = type;
+        }
+
         free(data);
         return 0;
     }
@@ -119,7 +137,7 @@ namespace PeterDB {
             free(data);
             return -1;
         }
-        if (writeRootPage() == -1) { return -1; }
+        if (writeRootPointerPage() == -1) { return -1; }
         fflush(fileHandle.pointer);
         free(data);
         return 0;
@@ -159,6 +177,7 @@ namespace PeterDB {
 
     RC IXFileHandle::appendPage(const void *data) {
         ixAppendPageCounter++;
+        numOfPages++;
         RC res = fileHandle.appendPage(data);
         return res;
     }
@@ -166,7 +185,7 @@ namespace PeterDB {
     RC IXFileHandle::appendRootPage(const Attribute &attribute) {
         char *data = (char *) calloc(PAGE_SIZE, 1);
         short offset = 0;
-        int newRoot = 0, newMinLeaf = 0;
+        int newRoot = 1, newMinLeaf = 1;
         memcpy(data + offset, &newRoot, sizeof(int));
         offset += sizeof(int);
         memcpy(data + offset, &newMinLeaf, sizeof(int));
@@ -179,7 +198,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC IXFileHandle::writeRootPage() {
+    RC IXFileHandle::writeRootPointerPage() {
         char *data = (char *) calloc(PAGE_SIZE, 1);
         short offset = 0;
         memcpy(data + offset, &root, sizeof(int));
@@ -189,8 +208,15 @@ namespace PeterDB {
         if (bTree != nullptr) {
             memcpy(data + offset, &bTree->attrType, sizeof(AttrType));
             offset += sizeof(AttrType);
+        } else {
+            AttrType nullType = TypeNull;
+            memcpy(data + offset, &nullType, sizeof(AttrType));
+            offset += sizeof(AttrType);
         }
-        if (writePage(0, data) == -1) { return -1; }
+        if (writePage(0, data) == -1) {
+            free(data);
+            return -1;
+        }
         free(data);
         return 0;
     }
@@ -202,7 +228,7 @@ namespace PeterDB {
         //Otherwise, set the root and minLeaf to -1.
         PeterDB::PagedFileManager &pfm = PeterDB::PagedFileManager::instance();
         if (pfm.openFile(fileName, ixFileHandle.fileHandle) == -1) { return -1; }
-        if (ixFileHandle.readHiddenPage() == -1) return -1;
+        if (ixFileHandle.readHiddenPage() == -1) { return -1; }
         if (ixFileHandle.root != NULLNODE) {
             if (setRoot(ixFileHandle) == -1) { return -1; }
         }
@@ -227,7 +253,14 @@ namespace PeterDB {
 
     RC IndexManager::setRoot(IXFileHandle &ixFileHandle) {
         char *rootPage = (char *) calloc(PAGE_SIZE, 1);
-        if (ixFileHandle.readPage(ixFileHandle.root, rootPage) == -1) { return -1; }
+        if (ixFileHandle.root == -1) {
+            ixFileHandle.bTree->root = nullptr;
+            return 0;
+        }
+        if (ixFileHandle.readPage(ixFileHandle.root, rootPage) == -1) {
+            free(rootPage);
+            return -1;
+        }
         if (ixFileHandle.bTree->generateNode(rootPage, ixFileHandle.bTree->root) == -1) { return -1; }
         ixFileHandle.bTree->root->pageNum = ixFileHandle.root;
         free(rootPage);
@@ -235,9 +268,50 @@ namespace PeterDB {
         return 0;
     }
 
+    RC IndexManager::getRootAndMinLeaf(IXFileHandle &ixFileHandle) {
+        if (ixFileHandle.numOfPages < 1) { return 0; }
+        char *rootPointerPage = (char *) calloc(PAGE_SIZE, 1);
+        if (ixFileHandle.readPage(0, rootPointerPage) == -1) {
+            free(rootPointerPage);
+            return -1;
+        }
+        int rootPageNum;
+        memcpy(&rootPageNum, rootPointerPage, sizeof(int));
+        ixFileHandle.root = rootPageNum;
+        int minLeafPageNum;
+        memcpy(&minLeafPageNum, rootPointerPage + sizeof(int), sizeof(int));
+        ixFileHandle.minLeaf = minLeafPageNum;
+
+        if (ixFileHandle.bTree == nullptr) { return 0; }
+        if (rootPageNum == -1 && minLeafPageNum == -1) {
+            ixFileHandle.bTree->root = nullptr;
+            ixFileHandle.bTree->minLeaf = nullptr;
+        } else if (rootPageNum != -1 && minLeafPageNum != -1) {
+            Node *rootPointer = new Node();
+            rootPointer->pageNum = rootPageNum;
+            if (ixFileHandle.bTree->loadNode(ixFileHandle, rootPointer) == -1) { return -1; }
+            ixFileHandle.bTree->root = rootPointer;
+
+            Node *minLeafPointer = new Node();
+            minLeafPointer->pageNum = minLeafPageNum;
+            if (ixFileHandle.bTree->loadNode(ixFileHandle, minLeafPointer) == -1) { return -1; }
+            ixFileHandle.bTree->minLeaf = minLeafPointer;
+        }
+        free(rootPointerPage);
+        return 0;
+    }
+
+
     RC IndexManager::setMinLeaf(IXFileHandle &ixFileHandle) {
         char *minPage = (char *) calloc(PAGE_SIZE, 1);
-        if (ixFileHandle.readPage(ixFileHandle.minLeaf, minPage) == -1) { return -1; }
+        if (ixFileHandle.minLeaf == -1) {
+            ixFileHandle.bTree->minLeaf = nullptr;
+            return 0;
+        }
+        if (ixFileHandle.readPage(ixFileHandle.minLeaf, minPage) == -1) {
+            free(minPage);
+            return -1;
+        }
         if (ixFileHandle.bTree->generateNode(minPage, ixFileHandle.bTree->minLeaf) == -1) { return -1; }
         ixFileHandle.bTree->minLeaf->pageNum = ixFileHandle.minLeaf;
         free(minPage);
@@ -245,11 +319,16 @@ namespace PeterDB {
         return 0;
     }
 
+
     RC
     IndexManager::insertEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid) {
+        //if (ixFileHandle.readRootPointerPage() == -1) { return -1; }
+        if (getRootAndMinLeaf(ixFileHandle) == -1) { return -1; }
+        //if (getMinLeaf(ixFileHandle) == -1) { return -1; }
         LeafEntry leafEntry(attribute.type, key, rid);
         if (ixFileHandle.bTree) {
-            return ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry);
+            ixFileHandle.bTree->attrType = attribute.type;
+            if (ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry) == -1) { return -1; }
         } else {
             ixFileHandle.bTree = new BTree();
             ixFileHandle.bTree->attrType = attribute.type;
@@ -263,8 +342,10 @@ namespace PeterDB {
             else {
                 if (setMinLeaf(ixFileHandle) == -1) { return -1; }
             }
-            return ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry);
+            if (ixFileHandle.bTree->insertEntry(ixFileHandle, leafEntry) == -1) { return -1; }
         }
+        //if (ixFileHandle.writeRootPointerPage() == -1) { return -1; }
+        //appendNum = ixFileHandle.ixAppendPageCounter;
         return 0;
     }
 
@@ -305,6 +386,7 @@ namespace PeterDB {
                              std::ostream &out) const {
         //This is a helper function to print out all the keys and rids in a leaf node.
         int start = 0;
+        int entrySize = dynamic_cast<LeafNode *>(node)->leafEntries.size();
         LeafEntry entry = dynamic_cast<LeafNode *>(node)->leafEntries[0];
         //Starting from the first entry in the node, print out the keys and rids.
         for (int i = 0; i <= dynamic_cast<LeafNode *>(node)->leafEntries.size(); i++) {
@@ -394,6 +476,10 @@ namespace PeterDB {
     }
 
     RC IndexManager::printBTree(IXFileHandle &ixFileHandle, const Attribute &attribute, std::ostream &out) {
+        //if (ixFileHandle.readRootPointerPage() == -1) { return -1; }
+        if (getRootAndMinLeaf(ixFileHandle) == -1) { return -1; }
+        //if (getMinLeaf(ixFileHandle) == -1) { return -1; }
+        PageNum rootPageNum = ixFileHandle.bTree->root->pageNum;
         return DFS(ixFileHandle, ixFileHandle.bTree->root, attribute, out);
     }
 
@@ -457,7 +543,7 @@ namespace PeterDB {
     }
 
     RC IndexManager::findExclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator,
-                                             Node *targetNode, bool startFound) {
+                                               Node *targetNode, bool startFound) {
         for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
              i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++) {
             if (compareKey(type, lowKey, (*i).key) < 0) {
@@ -486,12 +572,16 @@ namespace PeterDB {
                           bool lowKeyInclusive,
                           bool highKeyInclusive,
                           IX_ScanIterator &ix_ScanIterator) {
+        //if (ixFileHandle.readRootPointerPage() == -1) { return -1; }
+        if (getRootAndMinLeaf(ixFileHandle) == -1) { return -1; }
+        //if (getMinLeaf(ixFileHandle) == -1) { return -1; }
         ix_ScanIterator.type = attribute.type;
         if (ix_ScanIterator.setValues(lowKey, highKey, lowKeyInclusive, highKeyInclusive, ixFileHandle.fileHandle) ==
             -1) { return -1; }
         RID rid;
 
         if (lowKey == nullptr) {
+            ixFileHandle.ixReadPageCounter++;
             ix_ScanIterator.startPageNum = ixFileHandle.minLeaf;
             ix_ScanIterator.startEntryIndex = 0;
             ix_ScanIterator.curPageNum = ix_ScanIterator.startPageNum;
@@ -500,7 +590,7 @@ namespace PeterDB {
         return 0;
 
         LeafEntry lowKeyEntry(attribute.type, lowKey, rid);
-        Node *lowNode;
+        Node *lowNode = ixFileHandle.bTree->root;
         if (ixFileHandle.bTree->findLeafNode(ixFileHandle, lowKeyEntry, lowNode) == -1) { return -1; }
         if (lowNode->isLoaded == false) {
             if (ixFileHandle.bTree->loadNode(ixFileHandle, lowNode) == -1) { return -1; }
@@ -535,13 +625,13 @@ namespace PeterDB {
         return 0;
     }
 
-    RC IX_ScanIterator::getLeafHeaderFromPage(char* pageData, char nodeType, short nodeSize, int nodeParentPageNum, PageNum rightPageNum, PageNum overflowPageNum) {
+    RC IX_ScanIterator::getLeafHeaderFromPage(char* pageData, char &nodeType, short &nodeSize, int &nodeParentPageNum, PageNum &rightPageNum, PageNum &overflowPageNum) {
         short offset = 0;
         //Check the node type;
         memcpy(&nodeType, pageData + offset, sizeof(char));
         offset += sizeof(char);
-
         if (nodeType != LEAF) { return -1; }
+
         memcpy(&nodeSize, pageData + offset, sizeof(short));
         offset += sizeof(short);
 
@@ -571,7 +661,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC IX_ScanIterator::getLeafEntryFromPage(char *pageData, PageNum rightPageNum, short entryCount, RID &rid, void *key) {
+    RC IX_ScanIterator::getLeafEntryFromPage(char *pageData, PageNum &rightPageNum, short &entryCount, RID &rid, void *key) {
         //First, get the header information from the page.
         char nodeType;
         short nodeSize;
@@ -603,6 +693,10 @@ namespace PeterDB {
 
         // Read current page that is being scanned.
         if (fileHandle.readPage(curPageNum, pageData) == -1) { return -1; }
+
+        short entryCountTest;
+        memcpy(&entryCountTest, pageData + PAGE_SIZE - sizeof(short), sizeof(short));
+
         PageNum nextPageNum;
         short entryCount;
         if (getLeafEntryFromPage(pageData, nextPageNum, entryCount, rid, key) == -1) { return -1; }
@@ -636,7 +730,7 @@ namespace PeterDB {
         startEntryIndex = -1;
         curPageNum = -1;
         curEntryIndex = -1;
-        return -1;
+        return 0;
     }
 
     RC
@@ -645,6 +739,9 @@ namespace PeterDB {
         readPageCount = ixReadPageCounter;
         writePageCount = ixWritePageCounter;
         appendPageCount = ixAppendPageCounter;
+        /*readPageCount = fileHandle.readPageCounter;
+        writePageCount = fileHandle.writePageCounter;
+        appendPageCount = fileHandle.appendPageCounter;*/
         return 0;
     }
 
@@ -731,7 +828,7 @@ namespace PeterDB {
         //entry offset directory, and slot count.
 
         //set right pointer
-        int rightPage;
+        PageNum rightPage;
         if (dynamic_cast<LeafNode *>(node)->rightPointer) {
             rightPage = dynamic_cast<LeafNode *>(node)->rightPointer->pageNum;
         } else {
@@ -741,7 +838,7 @@ namespace PeterDB {
         offset += sizeof(PageNum);
 
         //set overflow pointer
-        int overflowPage;
+        PageNum overflowPage;
         if (dynamic_cast<LeafNode *>(node)->overflowPointer) {
             overflowPage = dynamic_cast<LeafNode *>(node)->overflowPointer->pageNum;
         } else {
@@ -760,6 +857,7 @@ namespace PeterDB {
             //set entry key
             setLeafEntryKeyInPage(node, page, offset, i);
             //set rid
+            PageNum pageNum = dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.pageNum;
             memcpy(page + offset, &dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.pageNum, sizeof(PageNum));
             offset += sizeof(PageNum);
             memcpy(page + offset, &dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.slotNum, sizeof(short));
@@ -774,6 +872,7 @@ namespace PeterDB {
         if (node == nullptr) return -1;
         char *page = (char *) calloc(PAGE_SIZE, 1);
         short offset = 0;
+        short entryCount;
         if (generatePageHeader(node, page, offset) == -1) { return -1; }
         if (node->type == INTERNAL) {
             if (generateInternalPage(node, page, offset) == -1) {
@@ -783,6 +882,7 @@ namespace PeterDB {
             if (generateLeafPage(node, page, offset) == -1) {
                 return -1;
             }
+            memcpy(&entryCount, page + PAGE_SIZE - sizeof(short), sizeof(short));
         }
         memcpy(data, page, PAGE_SIZE);
         free(page);
@@ -947,7 +1047,7 @@ namespace PeterDB {
         //This is a helper function that check the given node's pageNum in memory.
         //If it already exits in memory, set the node pointer to point to its address.
         //Otherwise, generate the node, load it into the memory and set the pointer.
-        if (node == nullptr) return -1;
+        if (node == nullptr) { return -1; }
         PageNum pageNum = node->pageNum;
         if (nodeMap.find(pageNum) != nodeMap.end()) {
             node = nodeMap[pageNum];
@@ -1055,10 +1155,11 @@ namespace PeterDB {
         //set meta fields
         ixFileHandle.root = newPageNum;
         ixFileHandle.minLeaf = newPageNum;
+
         return 0;
     }
 
-    RC BTree::insertEntryInLeafNode(Node *targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair) {
+    RC BTree::insertEntryInLeafNode(Node *&targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair) {
         //This is a helper function that insert pair entry into B+ Tree's leaf node.
 
         //Find the inserted leaf node, load it into memory if it hasn't been loaded.
@@ -1086,6 +1187,8 @@ namespace PeterDB {
 
         //This newly inserted entry takes up keySize + RID + directory space (short) in page.
         dynamic_cast<LeafNode *>(targetNode)->sizeInPage += pair.keySize + sizeof(RID) + sizeof(short);
+        int nodeSizeInPage = dynamic_cast<LeafNode *>(targetNode)->sizeInPage;
+        int nodePageNum = dynamic_cast<LeafNode *>(targetNode)->pageNum;
         return 0;
     }
 
@@ -1300,13 +1403,13 @@ namespace PeterDB {
         targetNode->internalEntries.erase(targetNode->internalEntries.begin() + internalEntryNum / 2 + 1,
                                           targetNode->internalEntries.end());
 
-        //write updated parent to file
+        //Write updated parent to file
         char *updatedParentPage = (char *) calloc(PAGE_SIZE, 1);
         if (generatePage(targetNode, updatedParentPage) == -1) { return -1; }
         if (ixFileHandle.writePage(targetNode->pageNum, updatedParentPage) == -1) { return -1; }
         free(updatedParentPage);
 
-        //write new internal node to file
+        //Write new internal node to file
         char *newInternalPage = (char *) calloc(PAGE_SIZE, 1);
         if (generatePage(newInternalNode, newInternalPage) == -1) { return -1; }
         if (ixFileHandle.appendPage(newInternalPage) == -1) { return -1; }
@@ -1330,7 +1433,7 @@ namespace PeterDB {
         int entrySizeInPage = newNode->internalEntries[0].keySize + sizeof(PageNum) + sizeof(short);
         rootParent->sizeInPage += entrySizeInPage;
 
-        //write root node to file
+        //Write root node to file
         char *rootPage = (char *) calloc(PAGE_SIZE, 1);
         if (generatePage(rootParent, rootPage) == -1) { return -1; }
         if (ixFileHandle.appendPage(rootPage) == -1) { return -1; }
@@ -1339,10 +1442,10 @@ namespace PeterDB {
         PageNum newPageNum = nodeMap.size() + 1;
         nodeMap[newPageNum] = rootParent;
         rootParent->pageNum = newPageNum;
-        //set parent
+        //Set parent
         targetNode->parent = rootParent;
         newNode->parent = rootParent;
-        //set meta fields
+        //Set meta fields
         ixFileHandle.root = newPageNum;
         root = rootParent;
 
@@ -1371,6 +1474,7 @@ namespace PeterDB {
             if (insertEntryInLeafNode(targetNode, ixFileHandle, pair) == -1) { return -1; }
             //If the inserted leaf node does not exceed space of one page,
             //generate a new page with this node and insert it into index file.
+            int nodePageNum = dynamic_cast<LeafNode *>(targetNode)->pageNum;
             if (dynamic_cast<LeafNode *>(targetNode)->sizeInPage <= PAGE_SIZE) {
                 return writeLeafNodeToFile(ixFileHandle, targetNode);
             } else { //Otherwise, split the leaf node, generate a new page with split node and write it into index file.

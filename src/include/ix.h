@@ -45,6 +45,9 @@ namespace PeterDB {
         // Set minLeaf of B+ Tree.
         RC setMinLeaf(IXFileHandle &ixFileHandle);
 
+        // Get root of B+ Tree from root pointer page.
+        RC getRootAndMinLeaf(IXFileHandle &ixFileHandle);
+
         // Insert an entry into the given index that is indicated by the given ixFileHandle.
         RC insertEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid);
 
@@ -62,6 +65,7 @@ namespace PeterDB {
 
         // Find the inclusive end entry of scanning in given leaf node.
         RC findExclusiveEndEntry(AttrType type, const void *highKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool endFound);
+
 
         // Initialize and IX_ScanIterator to support a range search
         RC scan(IXFileHandle &ixFileHandle,
@@ -114,13 +118,13 @@ namespace PeterDB {
         ~IX_ScanIterator();
 
         // Get header information from leaf page in index file;
-        RC getLeafHeaderFromPage(char* pageData, char nodeType, short nodeSize, int nodeParentPageNum, PageNum rightPageNum, PageNum overflowPageNum);
+        RC getLeafHeaderFromPage(char* pageData, char &nodeType, short &nodeSize, int &nodeParentPageNum, PageNum &rightPageNum, PageNum &overflowPageNum);
 
         // Get the key length of entry.
         RC getKeyLen(char *pageData, short &offset, short &keyLen);
 
         // Get leaf entry from leaf page in index file.
-        RC getLeafEntryFromPage(char* pageData, PageNum rightPageNum, short entryCount, RID &rid, void *key);
+        RC getLeafEntryFromPage(char* pageData, PageNum &rightPageNum, short &entryCount, RID &rid, void *key);
 
         // Get next matching entry
         RC getNextEntry(RID &rid, void *key);
@@ -154,7 +158,7 @@ namespace PeterDB {
 
         RC readHiddenPage();
 
-        RC readRootPage();
+        RC readRootPointerPage();
 
         RC writeHiddenPage();
 
@@ -166,7 +170,7 @@ namespace PeterDB {
 
         RC appendRootPage(const Attribute &attribute);
 
-        RC writeRootPage();
+        RC writeRootPointerPage();
     };
 
     class Node {
@@ -251,7 +255,7 @@ namespace PeterDB {
 
         RC initiateNullTree(IXFileHandle &ixFileHandle, const LeafEntry &pair);
 
-        RC insertEntryInLeafNode(Node *targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair);
+        RC insertEntryInLeafNode(Node *&targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair);
 
         RC writeLeafNodeToFile(IXFileHandle &ixFileHandle, Node *targetNode);
 

@@ -4,7 +4,7 @@
 #include "test/utils/ix_test_utils.h"
 
 namespace PeterDBTesting {
-    /*TEST_F(IX_File_Test, create_open_close_destory_index) {
+    TEST_F(IX_File_Test, create_open_close_destory_index) {
         // Functions tested
         // 1. Create Index File
         // 2. Open Index File
@@ -81,7 +81,7 @@ namespace PeterDBTesting {
 
         validateTree(stream, 1, 1, 0, PAGE_SIZE / 10 / 2, true);
 
-    }*/
+    }
 
     TEST_F(IX_Test, insert_one_entry_and_scan) {
         // Functions tested
@@ -96,12 +96,6 @@ namespace PeterDBTesting {
         // Insert one entry
         ASSERT_EQ(ix.insertEntry(ixFileHandle, ageAttr, &key, rid), success)
                                     << "indexManager::insertEntry() should succeed.";
-
-
-        /*char *data = (char *) malloc(PAGE_SIZE);
-        ixFileHandle.readPage(1, data);
-        short entryCount;
-        memcpy(&entryCount, data + PAGE_SIZE - sizeof(short), sizeof(short));*/
 
         // collect counters
         ASSERT_EQ(ixFileHandle.collectCounterValues(rc, wc, ac), success)
@@ -190,9 +184,9 @@ namespace PeterDBTesting {
         EXPECT_GE(getFileSize(indexFileName) / PAGE_SIZE, 2) << "File size should get increased.";
         EXPECT_EQ(getFileSize(indexFileName) % PAGE_SIZE, 0) << "File should be based on PAGE_SIZE.";
 
-    }
+    }*/
 
-    TEST_F(IX_Test, scan_on_destroyed_index) {
+    /*TEST_F(IX_Test, scan_on_destroyed_index) {
         // Functions tested
         // 1. Destroy Index File
         // 2. Open Index File -- should not succeed
@@ -586,7 +580,7 @@ namespace PeterDBTesting {
         // Close Scan
         ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
 
-    }
+    }*/
 
     TEST_F(IX_Test, scan_varchar_with_compact_size) {
         // Checks whether VARCHAR type is handled properly or not.
@@ -610,7 +604,8 @@ namespace PeterDBTesting {
 
             ASSERT_EQ(ix.insertEntry(ixFileHandle, empNameAttr, &key, rid), success)
                                         << "indexManager::insertEntry() should succeed.";
-
+            std::cout << "Inserting " << i << std::endl;
+            std::cout << key << std::endl;
             if (i % 100 == testedAscii) {
                 rids.emplace_back(rid);
             }
@@ -679,7 +674,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(IX_Test, split_rotate_and_promote_on_insertion) {
+    /*TEST_F(IX_Test, split_rotate_and_promote_on_insertion) {
         // Checks whether the insertion is implemented correctly (split should happen)
         // Functions tested
         // 1. Insert entries to make root full
