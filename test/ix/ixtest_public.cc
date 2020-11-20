@@ -136,7 +136,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
     }
 
-    /*TEST_F(IX_Test, insert_and_delete_one_entry) {
+    TEST_F(IX_Test, insert_and_delete_one_entry) {
         // Functions tested
         // 1. Insert one entry
         // 2. Disk I/O check of deleteEntry - CollectCounterValues
@@ -184,9 +184,9 @@ namespace PeterDBTesting {
         EXPECT_GE(getFileSize(indexFileName) / PAGE_SIZE, 2) << "File size should get increased.";
         EXPECT_EQ(getFileSize(indexFileName) % PAGE_SIZE, 0) << "File should be based on PAGE_SIZE.";
 
-    }*/
+    }
 
-    /*TEST_F(IX_Test, scan_on_destroyed_index) {
+    TEST_F(IX_Test, scan_on_destroyed_index) {
         // Functions tested
         // 1. Destroy Index File
         // 2. Open Index File -- should not succeed
@@ -208,7 +208,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(IX_Test, scan_by_NO_OP) {
+    /*TEST_F(IX_Test, scan_by_NO_OP) {
         // Functions tested
         // 1. Insert multiple entries
         // 2. Scan entries NO_OP -- open
@@ -301,6 +301,7 @@ namespace PeterDBTesting {
         // Insert more entries
         seed = value;
         generateAndInsertEntries(numOfMoreEntries, ageAttr, seed, salt);
+
 
         // Scan
         ASSERT_EQ(ix.scan(ixFileHandle, ageAttr, &value, NULL, true, true, ix_ScanIterator), success)
@@ -580,7 +581,7 @@ namespace PeterDBTesting {
         // Close Scan
         ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
 
-    }*/
+    }
 
     TEST_F(IX_Test, scan_varchar_with_compact_size) {
         // Checks whether VARCHAR type is handled properly or not.
@@ -674,7 +675,7 @@ namespace PeterDBTesting {
 
     }
 
-    /*TEST_F(IX_Test, split_rotate_and_promote_on_insertion) {
+    TEST_F(IX_Test, split_rotate_and_promote_on_insertion) {
         // Checks whether the insertion is implemented correctly (split should happen)
         // Functions tested
         // 1. Insert entries to make root full

@@ -60,13 +60,6 @@ namespace PeterDB {
         // Find the exclusive start entry of scanning in given leaf node.
         RC findExclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool startFound);
 
-        // Find the inclusive end entry of scanning in given leaf node.
-        RC findInclusiveEndEntry(AttrType type, const void *highKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool endFound);
-
-        // Find the inclusive end entry of scanning in given leaf node.
-        RC findExclusiveEndEntry(AttrType type, const void *highKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool endFound);
-
-
         // Initialize and IX_ScanIterator to support a range search
         RC scan(IXFileHandle &ixFileHandle,
                 const Attribute &attribute,
@@ -252,35 +245,39 @@ namespace PeterDB {
 
         ~BTree();
 
-        RC generateRootNode(LeafNode *&res, const LeafEntry &pair);
+        RC deleteEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair);
 
-        RC initiateNullTree(IXFileHandle &ixFileHandle, const LeafEntry &pair);
+        RC generateRootNode(LeafNode *&res);
 
-        RC insertEntryInLeafNode(Node *&targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair);
+        RC initiateNullTree(IXFileHandle &ixFileHandle);
+
+        RC insertEntryInLeafNode(LeafNode *targetNode, IXFileHandle &ixFileHandle, LeafEntry &entry);
 
         RC writeLeafNodeToFile(IXFileHandle &ixFileHandle, Node *targetNode);
 
-        RC setMidToSplit(Node *targetNode, int &mid);
+        RC setMidToSplit(LeafNode *targetNode, int &mid);
 
-        RC createNewSplitLeafNode(LeafNode *&newNode, LeafNode *&targetNode, int &mid);
+        RC createNewSplitLeafNode(LeafNode *newNode, LeafNode *targetNode, int &mid);
 
-        RC splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *&targetNode, LeafNode *&newNode);
+        RC splitLeafNode(IXFileHandle &ixFileHandle, LeafEntry &entry, LeafNode *targetNode, LeafNode *&newNode, InternalEntry *&newChildEntry);
 
         RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode);
 
-        RC updateInternalNode(InternalNode *&updateNode, InternalEntry &insertEntry);
-
-        RC updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode, InternalNode *&parent);
-
         RC writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *&parent);
 
-        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *&targetNode, InternalNode *&newInternalNode);
+        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *&newInternalNode, InternalEntry *newChildEntry);
 
-        RC createParentForSplitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newNode);
+        bool checkLeafNodeSpaceForInsertion(LeafNode *L, LeafEntry entry);
 
-        RC updateParentOfInternal(IXFileHandle &ixFileHandle, Node *targetNode, InternalNode *newNode, InternalNode *parent);
+        RC setNewChildEntryInLeaf(LeafNode *L2, InternalEntry *newChildEntry);
 
-        RC insertEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair);
+        RC createNewRoot(IXFileHandle &ixFileHandle, InternalEntry *newChildEntry);
+
+        bool checkInternalNodeSpaceForInsertion(InternalNode *N, InternalEntry *newChildEntry);
+
+        RC insertEntryInInternalNode(IXFileHandle ixFileHandle, InternalNode *targetNode, InternalEntry *newChildEntry);
+
+        RC insertEntry(IXFileHandle &ixFileHandle, Node *nodePointer, LeafEntry &entry, InternalEntry *newChildEntry);
 
         RC loadNode(IXFileHandle &ixFileHandle, Node *&node);
 
