@@ -586,8 +586,9 @@ namespace PeterDB {
             ix_ScanIterator.startEntryIndex = 0;
             ix_ScanIterator.curPageNum = ix_ScanIterator.startPageNum;
             ix_ScanIterator.curEntryIndex = ix_ScanIterator.startEntryIndex;
+            return 0;
         }
-        return 0;
+
 
         LeafEntry lowKeyEntry(attribute.type, lowKey, rid);
         Node *lowNode = ixFileHandle.bTree->root;
@@ -763,7 +764,17 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::setInternalEntryKeyInPage(Node *node, char *page, short &offset, int i) const {
+    RC BTree::setInternalEntryKeyInPage(Node *&node, char *page, short &offset, int i) const {
+        //Debug
+        int pageNum = node->pageNum;
+        int sizeInPage = node->sizeInPage;
+        char type = node->type;
+        int entrySize =  dynamic_cast<InternalNode *>(node)->internalEntries.size();
+        int keySize = dynamic_cast<InternalNode *>(node)->internalEntries[i].keySize;
+        int leftPageNum = dynamic_cast<InternalNode *>(node)->internalEntries[i].left->pageNum;
+        int rightPageNum = dynamic_cast<InternalNode *>(node)->internalEntries[i].right->pageNum;
+        //int keyInLeaf;
+        //dynamic_cast<LeafNode *>(dynamic_cast<InternalNode *>(node)->internalEntries[i].right)->leafEntries[0].key;
         if (attrType == TypeInt) {
             memcpy(page + offset, dynamic_cast<InternalNode *>(node)->internalEntries[i].key, sizeof(int));
             offset += sizeof(int);
@@ -869,7 +880,8 @@ namespace PeterDB {
 
     RC BTree::generatePage(Node *node, char *data) const {
         //Generate the page according to the node information.
-        if (node == nullptr) return -1;
+        int sizeInPage = node->sizeInPage;
+        if (node == nullptr) { return -1; }
         char *page = (char *) calloc(PAGE_SIZE, 1);
         short offset = 0;
         short entryCount;
@@ -889,7 +901,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::generateNodeHeader(Node *res, char *data, short &offset, short &slotCount) {
+    RC BTree::generateNodeHeader(Node *&res, char *data, short &offset, short &slotCount) {
         //This is a helper function to get some shared information from index file for both internal node and leaf node:
         //type, size, parent and slotCount.
         //Then set isLoaded to true,
@@ -946,7 +958,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::generateInternalNode(Node *res, char *data, short &offset, short &slotCount) {
+    RC BTree::generateInternalNode(Node *&res, char *data, short &offset, short &slotCount) {
         //This is a helper function to initialize following information of internal node:
         //left child, right child of each entry, entries vector in this node.
         for (int i = 0; i < slotCount; i++) {
@@ -1014,7 +1026,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::generateLeafNode(Node *res, char *data, short &offset, short &slotCount) {
+    RC BTree::generateLeafNode(Node *&res, char *data, short &offset, short &slotCount) {
         //This is a helper function to initialize following information of leaf node:
         //right pointer, overflow pointer, entries vector in this node.
 
@@ -1027,7 +1039,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::generateNode(char *data, Node *res) {
+    RC BTree::generateNode(char *data, Node *&res) {
         //This is a helper function that loads all the information of a node from index file into memory.
         //These information is stored in node class in memory.
         //Node class can either be internalNode or leafNode.
@@ -1086,7 +1098,7 @@ namespace PeterDB {
         return 0;
     }
 
-    int BTree::compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node) {
+    int BTree::compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&node) {
         //This is a helper function to compare key in internal node.
         //If it finds pair's value less than any entry's key in given internal node, it loads the entry's left child, and returns 1.
         //Otherwise, it loads the last entry's right child, and returns 0.
@@ -1114,7 +1126,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node) {
+    RC BTree::findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&node) {
         while (node->type != LEAF) {
             if (compareKeyInInternalNode(ixFileHandle, pair, node) == 1) {
                 break;
@@ -1123,7 +1135,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::generateRootNode(LeafNode *res, const LeafEntry &pair) {
+    RC BTree::generateRootNode(LeafNode *&res, const LeafEntry &pair) {
         //This is a helper function that creates root node with one leaf entry.
         //These information is stored in node class in memory.
         res->leafEntries.push_back(pair);
@@ -1241,7 +1253,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::createNewSplitLeafNode(LeafNode *newNode, LeafNode *targetNode, int &mid) {
+    RC BTree::createNewSplitLeafNode(LeafNode *&newNode, LeafNode *&targetNode, int &mid) {
         //Split node, push the entries into new node and update size
         for (int i = mid; i < targetNode->leafEntries.size(); i++) {
             LeafEntry leafEntry(attrType, targetNode->leafEntries[i].key, targetNode->leafEntries[i].rid);
@@ -1261,7 +1273,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *targetNode, LeafNode *newNode) {
+    RC BTree::splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *&targetNode, LeafNode *&newNode) {
         //This is a helper function to split leaf node, write both old and new node to index file.
         newNode = new LeafNode();
         newNode->isLoaded = true;
@@ -1271,9 +1283,9 @@ namespace PeterDB {
 
         //Find the correct mid point for leaf node to split.
         int mid;
-        if (setMidToSplit(targetNode, mid) == 0) { return -1; }
+        if (setMidToSplit(targetNode, mid) == -1) { return -1; }
 
-        if (createNewSplitLeafNode(newNode, targetNode, mid) == 0) { return -1; }
+        if (createNewSplitLeafNode(newNode, targetNode, mid) == -1) { return -1; }
 
         //Write updated targetNode to file
         char *updatedTargetPage = (char *) calloc(PAGE_SIZE, 1);
@@ -1293,7 +1305,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode) {
+    RC BTree::createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode) {
         //This is a helper function that creates a parent node for split leaf node.
         //It insert the first entry of new split node into the parent node, set the parameters of the parent node,
         //generate its page and writes it into index file.
@@ -1304,6 +1316,8 @@ namespace PeterDB {
         parent->type = INTERNAL;
         int entrySizeInPage = newNode->leafEntries[0].keySize + sizeof(RID) + sizeof(short);
         parent->sizeInPage += entrySizeInPage;
+        //Debug
+        int keySize = newNode->leafEntries[0].keySize;
 
         //Write parent node to file
         char *parentPage = (char *) calloc(PAGE_SIZE, 1);
@@ -1324,7 +1338,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::updateInternalNode(InternalNode *updateNode, InternalEntry &insertEntry) {
+    RC BTree::updateInternalNode(InternalNode *&updateNode, InternalEntry &insertEntry) {
         //This is a helper function to update internal node in B+ Tree by inserting new entry into this node.
         PeterDB::IndexManager &idm = PeterDB::IndexManager::instance();
         bool isAdded = false;
@@ -1363,26 +1377,28 @@ namespace PeterDB {
     }
 
     RC
-    BTree::updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode, InternalNode *parent) {
+    BTree::updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode, InternalNode *&parent) {
+        //Debug
         parent = dynamic_cast<InternalNode *>(dynamic_cast<LeafNode *>(targetNode)->parent);
         PageNum parentPageNum = targetNode->parent->pageNum;
         InternalEntry insertEntry(attrType, newNode->leafEntries[0].key, targetNode, newNode);
-
+        int copyKeySize = newNode->leafEntries[0].keySize;
         if (updateInternalNode(parent, insertEntry) == -1) { return -1; }
 
         return 0;
     }
 
-    RC BTree::writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *parent) {
+    RC BTree::writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *&parent) {
+        int parentPageNum = parent->pageNum;
         char *updatedParentPage = (char *) calloc(PAGE_SIZE, 1);
-        generatePage(parent, updatedParentPage);
+        if (generatePage(parent, updatedParentPage) == -1) { return -1; }
         if (ixFileHandle.writePage(dynamic_cast<InternalNode *>(parent)->pageNum, updatedParentPage) ==
             -1) { return -1; }
         free(updatedParentPage);
         return 0;
     }
 
-    RC BTree::splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newInternalNode) {
+    RC BTree::splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *&targetNode, InternalNode *&newInternalNode) {
         //This is a helper function to split internal node, write both old and new node to index file.
         newInternalNode = new InternalNode();
         newInternalNode->isLoaded = true;
@@ -1392,6 +1408,10 @@ namespace PeterDB {
         for (int i = internalEntryNum / 2 + 1; i < internalEntryNum; i++) {
             InternalEntry moveEntry = targetNode->internalEntries[i];
             InternalEntry internalEntry(attrType, moveEntry.key, moveEntry.left, moveEntry.right);
+            if (attrType == TypeVarChar) {
+                int keySize;
+                memcpy(&keySize, moveEntry.key, sizeof(int));
+            }
             newInternalNode->internalEntries.push_back(internalEntry);
             //This moved entry takes up keySize + left pointer + directory space (short) in page.
             int entrySizeInPage = internalEntry.keySize + sizeof(PageNum) + sizeof(short);
@@ -1474,13 +1494,11 @@ namespace PeterDB {
             if (insertEntryInLeafNode(targetNode, ixFileHandle, pair) == -1) { return -1; }
             //If the inserted leaf node does not exceed space of one page,
             //generate a new page with this node and insert it into index file.
-            int nodePageNum = dynamic_cast<LeafNode *>(targetNode)->pageNum;
             if (dynamic_cast<LeafNode *>(targetNode)->sizeInPage <= PAGE_SIZE) {
                 return writeLeafNodeToFile(ixFileHandle, targetNode);
             } else { //Otherwise, split the leaf node, generate a new page with split node and write it into index file.
                 LeafNode *newNode;
-                if (splitLeafNode(ixFileHandle, dynamic_cast<LeafNode *>(targetNode), newNode) == -1) { return -1; }
-
+                if (splitLeafNode(ixFileHandle, reinterpret_cast<LeafNode *&>(targetNode), newNode) == -1) { return -1; }
                 //If there is no parent for old node, create one and return.
                 if (dynamic_cast<LeafNode *>(targetNode)->parent == nullptr) {
                     return createParentForSplitLeafNode(ixFileHandle, targetNode, newNode);
@@ -1647,7 +1665,8 @@ namespace PeterDB {
             this->key = malloc(sizeof(float));
             memcpy(this->key, key, sizeof(float));
         } else if (attribute == TypeVarChar) {
-            int strLen = *(int *) key;
+            int strLen;
+            memcpy(&strLen, key, sizeof(int));
             this->key = malloc(sizeof(int) + strLen);
             keySize = sizeof(int) + strLen;
             memcpy(this->key, key, sizeof(int) + strLen);

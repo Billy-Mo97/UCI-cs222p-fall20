@@ -107,6 +107,7 @@ namespace PeterDB {
         PageNum curPageNum = -1;
         int curEntryIndex = -1;
         FileHandle fileHandle;
+        IXFileHandle *ixFileHandle;
 
         // Interface
         RC setValues(const void *lowKey, const void *highKey, bool lowKeyInclusive, bool highKeyInclusive, FileHandle fileHandle);
@@ -251,7 +252,7 @@ namespace PeterDB {
 
         ~BTree();
 
-        RC generateRootNode(LeafNode* res, const LeafEntry &pair);
+        RC generateRootNode(LeafNode *&res, const LeafEntry &pair);
 
         RC initiateNullTree(IXFileHandle &ixFileHandle, const LeafEntry &pair);
 
@@ -261,19 +262,19 @@ namespace PeterDB {
 
         RC setMidToSplit(Node *targetNode, int &mid);
 
-        RC createNewSplitLeafNode(LeafNode *newNode, LeafNode *targetNode, int &mid);
+        RC createNewSplitLeafNode(LeafNode *&newNode, LeafNode *&targetNode, int &mid);
 
-        RC splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *targetNode, LeafNode *newNode);
+        RC splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *&targetNode, LeafNode *&newNode);
 
-        RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode);
+        RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode);
 
-        RC updateInternalNode(InternalNode *updateNode, InternalEntry &insertEntry);
+        RC updateInternalNode(InternalNode *&updateNode, InternalEntry &insertEntry);
 
-        RC updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode, InternalNode *parent);
+        RC updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode, InternalNode *&parent);
 
-        RC writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *parent);
+        RC writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *&parent);
 
-        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newInternalNode);
+        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *&targetNode, InternalNode *&newInternalNode);
 
         RC createParentForSplitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newNode);
 
@@ -283,13 +284,13 @@ namespace PeterDB {
 
         RC loadNode(IXFileHandle &ixFileHandle, Node *&node);
 
-        int compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *node);
+        int compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&node);
 
-        RC findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *curNode);
+        RC findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&curNode);
 
         static RC generatePageHeader(Node *node, char *page, short &offset);
 
-        RC setInternalEntryKeyInPage(Node *node, char *page, short &offset, int i) const;
+        RC setInternalEntryKeyInPage(Node *&node, char *page, short &offset, int i) const;
 
         RC generateInternalPage(Node *node, char *page, short &offset) const;
 
@@ -299,7 +300,7 @@ namespace PeterDB {
 
         RC generatePage(Node *node, char *data) const;
 
-        RC generateNodeHeader(Node *res, char *data, short &offset, short &slotCount);
+        RC generateNodeHeader(Node *&res, char *data, short &offset, short &slotCount);
 
         RC getKeyLen(char *data, short &offset, short &keyLen) const;
 
@@ -307,7 +308,7 @@ namespace PeterDB {
 
         RC getRightInternalEntry(InternalEntry &entry, char *data, short offset, short keyLen);
 
-        RC generateInternalNode(Node *res, char *data, short &offset, short &slotCount);
+        RC generateInternalNode(Node *&res, char *data, short &offset, short &slotCount);
 
         RC getRightPointerInLeafNode(Node *res, char *data, short &offset);
 
@@ -315,9 +316,9 @@ namespace PeterDB {
 
         RC getEntriesInLeafNode(Node *res, char *data, short &offset, short &slotCount);
 
-        RC generateLeafNode(Node *res, char *data, short &offset, short &slotCount);
+        RC generateLeafNode(Node *&res, char *data, short &offset, short &slotCount);
 
-        RC generateNode(char *data, Node* res);
+        RC generateNode(char *data, Node *&res);
 
         RC getMaxLeaf(LeafNode *maxLeafNode);
         //int compareKey(void* v1, void* v2);
