@@ -95,7 +95,7 @@ namespace PeterDB {
             return -1;
         }
         if (pointer == nullptr) {
-            std::cout << "fileHandle is pointing to nullptr.\n";
+            //std::cout << "fileHandle is pointing to nullptr.\n";
             return -1;
         }
         fseek(pointer, (pageNum + 1) * PAGE_SIZE, SEEK_SET);
