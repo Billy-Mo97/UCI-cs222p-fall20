@@ -60,13 +60,6 @@ namespace PeterDB {
         // Find the exclusive start entry of scanning in given leaf node.
         RC findExclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool startFound);
 
-        // Find the inclusive end entry of scanning in given leaf node.
-        RC findInclusiveEndEntry(AttrType type, const void *highKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool endFound);
-
-        // Find the inclusive end entry of scanning in given leaf node.
-        RC findExclusiveEndEntry(AttrType type, const void *highKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool endFound);
-
-
         // Initialize and IX_ScanIterator to support a range search
         RC scan(IXFileHandle &ixFileHandle,
                 const Attribute &attribute,
@@ -107,6 +100,7 @@ namespace PeterDB {
         PageNum curPageNum = -1;
         int curEntryIndex = -1;
         FileHandle fileHandle;
+        IXFileHandle *ixFileHandle;
 
         // Interface
         RC setValues(const void *lowKey, const void *highKey, bool lowKeyInclusive, bool highKeyInclusive, FileHandle fileHandle);
@@ -251,45 +245,49 @@ namespace PeterDB {
 
         ~BTree();
 
-        RC generateRootNode(LeafNode* res, const LeafEntry &pair);
+        RC deleteEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair);
 
-        RC initiateNullTree(IXFileHandle &ixFileHandle, const LeafEntry &pair);
+        RC generateRootNode(LeafNode *&res);
 
-        RC insertEntryInLeafNode(Node *&targetNode, IXFileHandle &ixFileHandle, const LeafEntry &pair);
+        RC initiateNullTree(IXFileHandle &ixFileHandle);
+
+        RC insertEntryInLeafNode(LeafNode *targetNode, IXFileHandle &ixFileHandle, LeafEntry &entry);
 
         RC writeLeafNodeToFile(IXFileHandle &ixFileHandle, Node *targetNode);
 
-        RC setMidToSplit(Node *targetNode, int &mid);
+        RC setMidToSplit(LeafNode *targetNode, int &mid);
 
         RC createNewSplitLeafNode(LeafNode *newNode, LeafNode *targetNode, int &mid);
 
-        RC splitLeafNode(IXFileHandle &ixFileHandle, LeafNode *targetNode, LeafNode *newNode);
+        RC splitLeafNode(IXFileHandle &ixFileHandle, LeafEntry &entry, LeafNode *targetNode, LeafNode *&newNode, InternalEntry *&newChildEntry);
 
-        RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode);
+        RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode);
 
-        RC updateInternalNode(InternalNode *updateNode, InternalEntry &insertEntry);
+        RC writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *&parent);
 
-        RC updateParentOfLeaf(IXFileHandle &ixFileHandle, Node *targetNode, LeafNode *newNode, InternalNode *parent);
+        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *&newInternalNode, InternalEntry *newChildEntry);
 
-        RC writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *parent);
+        bool checkLeafNodeSpaceForInsertion(LeafNode *L, LeafEntry entry);
 
-        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newInternalNode);
+        RC setNewChildEntryInLeaf(LeafNode *L2, InternalEntry *newChildEntry);
 
-        RC createParentForSplitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *newNode);
+        RC createNewRoot(IXFileHandle &ixFileHandle, InternalEntry *newChildEntry);
 
-        RC updateParentOfInternal(IXFileHandle &ixFileHandle, Node *targetNode, InternalNode *newNode, InternalNode *parent);
+        bool checkInternalNodeSpaceForInsertion(InternalNode *N, InternalEntry *newChildEntry);
 
-        RC insertEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair);
+        RC insertEntryInInternalNode(IXFileHandle ixFileHandle, InternalNode *targetNode, InternalEntry *newChildEntry);
+
+        RC insertEntry(IXFileHandle &ixFileHandle, Node *nodePointer, LeafEntry &entry, InternalEntry *newChildEntry);
 
         RC loadNode(IXFileHandle &ixFileHandle, Node *&node);
 
-        int compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node*node);
+        int compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&node);
 
-        RC findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node*curNode);
+        RC findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&curNode);
 
         static RC generatePageHeader(Node *node, char *page, short &offset);
 
-        RC setInternalEntryKeyInPage(Node *node, char *page, short &offset, int i) const;
+        RC setInternalEntryKeyInPage(Node *&node, char *page, short &offset, int i) const;
 
         RC generateInternalPage(Node *node, char *page, short &offset) const;
 
@@ -299,7 +297,7 @@ namespace PeterDB {
 
         RC generatePage(Node *node, char *data) const;
 
-        RC generateNodeHeader(Node *res, char *data, short &offset, short &slotCount);
+        RC generateNodeHeader(Node *&res, char *data, short &offset, short &slotCount);
 
         RC getKeyLen(char *data, short &offset, short &keyLen) const;
 
@@ -307,7 +305,7 @@ namespace PeterDB {
 
         RC getRightInternalEntry(InternalEntry &entry, char *data, short offset, short keyLen);
 
-        RC generateInternalNode(Node *res, char *data, short &offset, short &slotCount);
+        RC generateInternalNode(Node *&res, char *data, short &offset, short &slotCount);
 
         RC getRightPointerInLeafNode(Node *res, char *data, short &offset);
 
@@ -315,13 +313,13 @@ namespace PeterDB {
 
         RC getEntriesInLeafNode(Node *res, char *data, short &offset, short &slotCount);
 
-        RC generateLeafNode(Node *res, char *data, short &offset, short &slotCount);
+        RC generateLeafNode(Node *&res, char *data, short &offset, short &slotCount);
 
-        RC generateNode(char *data, Node* res);
+        RC generateNode(char *data, Node *&res);
 
         RC getMaxLeaf(LeafNode *maxLeafNode);
         //int compareKey(void* v1, void* v2);
-        RC deleteEntry(IXFileHandle &ixfileHandle, const LeafEntry &pair);
+//        RC deleteEntry(IXFileHandle &ixfileHandle, const LeafEntry &pair);
 //        RC findRecord(IXFileHandle &ixfileHandle, const LeafEntry &pair, std::vector<LeafEntry>::iterator &result);
 //        RC findLeaf(IXFileHandle &ixfileHandle, const LeafEntry &pair, LeafNode** &result);
 
