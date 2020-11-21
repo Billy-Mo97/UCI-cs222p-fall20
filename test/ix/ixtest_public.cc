@@ -4,7 +4,7 @@
 #include "test/utils/ix_test_utils.h"
 
 namespace PeterDBTesting {
-    TEST_F(IX_File_Test, create_open_close_destory_index) {
+    /*TEST_F(IX_File_Test, create_open_close_destory_index) {
         // Functions tested
         // 1. Create Index File
         // 2. Open Index File
@@ -208,7 +208,7 @@ namespace PeterDBTesting {
 
     }
 
-    /*TEST_F(IX_Test, scan_by_NO_OP) {
+    TEST_F(IX_Test, scan_by_NO_OP) {
         // Functions tested
         // 1. Insert multiple entries
         // 2. Scan entries NO_OP -- open
@@ -234,6 +234,8 @@ namespace PeterDBTesting {
         int count = 0;
         while (ix_ScanIterator.getNextEntry(rid, &key) == success) {
             validateUnorderedRID(key, count + seed, ridsCopy);
+            //std::cout << "Scanning: " << key << std::endl;
+            //std::cout << "Expected: " << count + seed << std::endl;
             count++;
             if (count % 5000 == 0) {
                 GTEST_LOG_(INFO) << count << " - Returned rid: " << rid.pageNum << " " << rid.slotNum;
@@ -307,6 +309,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(ix.scan(ixFileHandle, ageAttr, &value, NULL, true, true, ix_ScanIterator), success)
                                     << "indexManager::scan() should succeed.";
 
+        int startPageNum = ix_ScanIterator.curPageNum;
         // IndexScan iterator
         unsigned count = 0;
         while (ix_ScanIterator.getNextEntry(rid, &key) == success) {
@@ -368,7 +371,7 @@ namespace PeterDBTesting {
         EXPECT_GE (getFileSize(indexFileName) / PAGE_SIZE, (numOfEntries + numOfMoreEntries) / PAGE_SIZE / 10)
                             << "page size should be increased.";
 
-    }
+    }*/
 
     TEST_F(IX_Test, scan_by_EQ_OP) {
         // Functions tested
@@ -383,7 +386,7 @@ namespace PeterDBTesting {
 
         // Insert entries
         generateAndInsertEntries(numOfEntries, ageAttr, seed, salt, key1);
-
+        /*
         // Insert more entries
         rids.clear();
         seed += 10;
@@ -409,11 +412,11 @@ namespace PeterDBTesting {
         EXPECT_EQ(count, numOfMoreEntries) << "scanned count should match inserted.";
 
         // Close Scan
-        ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
+        ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";*/
 
     }
 
-    TEST_F(IX_Test, scan_on_reinserted_entries) {
+    /*TEST_F(IX_Test, scan_on_reinserted_entries) {
         // Functions tested
         // 1. Insert large number of records
         // 2. Scan large number of records to validate insert correctly

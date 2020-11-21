@@ -55,10 +55,10 @@ namespace PeterDB {
         RC deleteEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid);
 
         // Find the inclusive start entry of scanning in given leaf node.
-        RC findInclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool startFound);
+        RC findInclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node *&targetNode, bool &startFound);
 
         // Find the exclusive start entry of scanning in given leaf node.
-        RC findExclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node* targetNode, bool startFound);
+        RC findExclusiveStartEntry(AttrType type, const void *lowKey, IX_ScanIterator &ix_ScanIterator, Node *&targetNode, bool &startFound);
 
         // Initialize and IX_ScanIterator to support a range search
         RC scan(IXFileHandle &ixFileHandle,
@@ -112,7 +112,7 @@ namespace PeterDB {
         ~IX_ScanIterator();
 
         // Get header information from leaf page in index file;
-        RC getLeafHeaderFromPage(char* pageData, char &nodeType, short &nodeSize, int &nodeParentPageNum, PageNum &rightPageNum, PageNum &overflowPageNum);
+        RC getLeafHeaderFromPage(char* pageData, char &nodeType, short &nodeSize, PageNum &rightPageNum, PageNum &overflowPageNum);
 
         // Get the key length of entry.
         RC getKeyLen(char *pageData, short &offset, short &keyLen);
@@ -140,6 +140,7 @@ namespace PeterDB {
         int root;
         int minLeaf;
         BTree *bTree;
+        std::string fileName;
 
         // Constructor
         IXFileHandle();
@@ -277,11 +278,13 @@ namespace PeterDB {
 
         RC insertEntryInInternalNode(IXFileHandle ixFileHandle, InternalNode *targetNode, InternalEntry *newChildEntry);
 
-        RC insertEntry(IXFileHandle &ixFileHandle, Node *nodePointer, LeafEntry &entry, InternalEntry *newChildEntry);
+        RC insertEntry(IXFileHandle &ixFileHandle, Node *nodePointer, LeafEntry &entry, InternalEntry *&newChildEntry);
 
         RC loadNode(IXFileHandle &ixFileHandle, Node *&node);
 
-        int compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&node);
+        RC compareKeyInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&node);
+
+        RC chooseSubTreeInInternalNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&node);
 
         RC findLeafNode(IXFileHandle &ixFileHandle, const LeafEntry &pair, Node *&curNode);
 
