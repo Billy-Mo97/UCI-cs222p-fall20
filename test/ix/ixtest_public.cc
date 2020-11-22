@@ -371,7 +371,7 @@ namespace PeterDBTesting {
         EXPECT_GE (getFileSize(indexFileName) / PAGE_SIZE, (numOfEntries + numOfMoreEntries) / PAGE_SIZE / 10)
                             << "page size should be increased.";
 
-    }*/
+    }
 
     TEST_F(IX_Test, scan_by_EQ_OP) {
         // Functions tested
@@ -380,13 +380,13 @@ namespace PeterDBTesting {
 
         unsigned key1 = 400;
         unsigned key2 = 100;
-        unsigned numOfEntries = 5000;
-        unsigned numOfMoreEntries = 10000;
+        unsigned numOfEntries = 200;
+        unsigned numOfMoreEntries = 100;
         unsigned key, seed = 10090, salt = 5617;
 
         // Insert entries
         generateAndInsertEntries(numOfEntries, ageAttr, seed, salt, key1);
-        /*
+
         // Insert more entries
         rids.clear();
         seed += 10;
@@ -412,11 +412,11 @@ namespace PeterDBTesting {
         EXPECT_EQ(count, numOfMoreEntries) << "scanned count should match inserted.";
 
         // Close Scan
-        ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";*/
+        ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
 
-    }
+    }*/
 
-    /*TEST_F(IX_Test, scan_on_reinserted_entries) {
+    TEST_F(IX_Test, scan_on_reinserted_entries) {
         // Functions tested
         // 1. Insert large number of records
         // 2. Scan large number of records to validate insert correctly
@@ -526,7 +526,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(IX_Test, scan_to_delete_entries) {
+    /*TEST_F(IX_Test, scan_to_delete_entries) {
         // Checks whether deleting an entry after getNextEntry() in a scan is handled properly or not.
         //    An example:
         //    IX_ScanIterator ix_ScanIterator;

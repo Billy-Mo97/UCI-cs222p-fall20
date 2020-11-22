@@ -343,7 +343,7 @@ namespace PeterDB {
             if (ixFileHandle.bTree->insertEntry(ixFileHandle, ixFileHandle.bTree->root, leafEntry, newChildEntry) == -1) { return -1; }
         } else {
             InternalEntry *newChildEntry = nullptr;
-            std::cout << "Inserting entry, root: " << ixFileHandle.bTree->root->pageNum << std::endl;
+            //std::cout << "Inserting entry, root: " << ixFileHandle.bTree->root->pageNum << std::endl;
             if (ixFileHandle.bTree->insertEntry(ixFileHandle, ixFileHandle.bTree->root, leafEntry, newChildEntry) == -1) { return -1; }
         }
         if (ixFileHandle.writeRootPointerPage() == -1) { return -1; }
@@ -1296,6 +1296,7 @@ namespace PeterDB {
 
     RC BTree::insertEntryInLeafNode(LeafNode *targetNode, IXFileHandle &ixFileHandle, LeafEntry &entry) {
         // This is a helper function to insert entry into leaf node, then write it into index file.
+        // Debug
 
         PeterDB::IndexManager &idm = PeterDB::IndexManager::instance();
         // Insert the entry into targetNode
@@ -1535,7 +1536,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *&newInternalNode, InternalEntry *newChildEntry) {
+    RC BTree::splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *&newInternalNode, InternalEntry *&newChildEntry) {
         //This is a helper function to insert newChildEntry into target internal node, split it,  write both old and new node to index file.
 
         PeterDB::IndexManager &idm = PeterDB::IndexManager::instance();

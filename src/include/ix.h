@@ -262,15 +262,15 @@ namespace PeterDB {
 
         RC splitLeafNode(IXFileHandle &ixFileHandle, LeafEntry &entry, LeafNode *targetNode, LeafNode *&newNode, InternalEntry *&newChildEntry);
 
-        RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode);
+        //RC createParentForSplitLeafNode(IXFileHandle &ixFileHandle, Node *&targetNode, LeafNode *&newNode);
 
         RC writeParentNodeToFile(IXFileHandle &ixFileHandle, InternalNode *&parent);
 
-        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *&newInternalNode, InternalEntry *newChildEntry);
+        RC splitInternalNode(IXFileHandle &ixFileHandle, InternalNode *targetNode, InternalNode *&newInternalNode, InternalEntry *&newChildEntry);
 
         bool checkLeafNodeSpaceForInsertion(LeafNode *L, LeafEntry entry);
 
-        RC setNewChildEntryInLeaf(LeafNode *L2, InternalEntry *newChildEntry);
+        //RC setNewChildEntryInLeaf(LeafNode *L2, InternalEntry *newChildEntry);
 
         RC createNewRoot(IXFileHandle &ixFileHandle, InternalEntry *newChildEntry);
 
