@@ -360,15 +360,22 @@ namespace PeterDB {
     }
 
     RC BTree::deleteEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair){
+        // Debug
         Node* targetNode = root;
         ixFileHandle.ixReadPageCounter++;
+        int rootPageNum = root->pageNum;
         if (findLeafNode(ixFileHandle, pair, targetNode) == -1) { return -1; };
+        int findLeafNodePageNum = targetNode->pageNum;
         if (dynamic_cast<LeafNode *>(targetNode)->isLoaded == false) {
             if (loadNode(ixFileHandle, targetNode) == -1) { return -1; }
         }
         //If we find pair, delete it
         for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
              i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++) {
+            int pairPageNum = pair.rid.pageNum;
+            short pairSlotNum = pair.rid.slotNum;
+            int iPageNum = (*i).rid.pageNum;
+            int iSlotNum = (*i).rid.slotNum;
             if (PeterDB::IndexManager::instance().compareKey(attrType, pair.key, (*i).key) == 0) {
                 if(pair.rid.pageNum == (*i).rid.pageNum && pair.rid.slotNum == (*i).rid.slotNum){
                     dynamic_cast<LeafNode *>(targetNode)->leafEntries.erase(i);
@@ -1142,7 +1149,9 @@ namespace PeterDB {
         //This is a helper function to compare key in internal node.
         //If it finds pair's value less than any entry's key in given internal node, it loads the entry's left child, and returns 1.
         //Otherwise, it loads the last entry's right child, and returns 0.
+        //Debug
         PeterDB::IndexManager &idm = PeterDB::IndexManager::instance();
+        int curNodePageNum = node->pageNum;
         int size = dynamic_cast<InternalNode *>(node)->internalEntries.size();
         if (size == 1) {
             if (idm.compareKey(attrType, pair.key, dynamic_cast<InternalNode *>(node)->internalEntries[0].key) >=
@@ -1457,6 +1466,10 @@ namespace PeterDB {
 
         InternalEntry insertEntry(ixFileHandle.bTree->attrType, newChildEntry->key, newChildEntry->left, newChildEntry->right);
         delete newChildEntry;
+        int leftPageNum = insertEntry.left->pageNum;
+        int rightPageNum = insertEntry.right->pageNum;
+        int leftType = insertEntry.left->type;
+        int rightType = insertEntry.right->type;
         //std::cout << "creating new root, left: " << insertEntry.left->pageNum << std::endl;
         //std::cout << "creating new root, right: " << insertEntry.right->pageNum << std::endl;
         newRootNode->internalEntries.push_back(insertEntry);
@@ -1588,8 +1601,7 @@ namespace PeterDB {
                                           targetNode->internalEntries.end());
 
         // Set the newChildEntry to the first entry on new node, then erase it from new node.
-        newChildEntry = new InternalEntry(attrType, newInternalNode->internalEntries[0].key,
-                                          newInternalNode->internalEntries[0].left, newInternalNode->internalEntries[0].right);
+        newChildEntry = new InternalEntry(attrType, newInternalNode->internalEntries[0].key, targetNode, newInternalNode);
         newInternalNode->internalEntries.erase(newInternalNode->internalEntries.begin());
 
         PageNum newPageNum = nodeMap.size() + 1;
