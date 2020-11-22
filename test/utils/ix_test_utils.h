@@ -209,6 +209,11 @@ namespace PeterDBTesting {
                 rids.emplace_back(rid);
                 T key = fixedKey == NULL ? value : fixedKey;
                 std::cout << "Inserting " << i << "th entry.\n";
+                if (i == 59859) {
+                    ASSERT_EQ(ix.insertEntry(ixFileHandle, attr, &key, rid), success)
+                                                << "indexManager::insertEntry() should succeed.";
+                    continue;
+                }
                 ASSERT_EQ(ix.insertEntry(ixFileHandle, attr, &key, rid), success)
                                             << "indexManager::insertEntry() should succeed.";
             }
