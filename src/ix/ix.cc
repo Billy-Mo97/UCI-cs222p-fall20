@@ -460,7 +460,7 @@ namespace PeterDB {
                     if (printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
                     start = i;
                     entry = dynamic_cast<LeafNode *>(node)->leafEntries[i];
-                    if (i == dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",";
+                    if (i != dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",";
                 }
             }
         }
@@ -475,16 +475,16 @@ namespace PeterDB {
             out << '"';
             if (attribute.type == TypeInt) {
                 int key;
-                memcpy(&key, (char *) (dynamic_cast<LeafNode *>(node))->leafEntries[i].key, sizeof(int));
+                memcpy(&key, (char *) (dynamic_cast<InternalNode *>(node))->internalEntries[i].key, sizeof(int));
                 out << key << '"';
             } else if (attribute.type == TypeReal) {
                 float key;
-                memcpy(&key, (char *) (dynamic_cast<LeafNode *>(node))->leafEntries[i].key, sizeof(float));
+                memcpy(&key, (char *) (dynamic_cast<InternalNode *>(node))->internalEntries[i].key, sizeof(float));
                 out << key << '"';
             } else if (attribute.type == TypeVarChar) {
                 int len;
-                memcpy(&len, (dynamic_cast<LeafNode *>(node))->leafEntries[i].key, sizeof(int));
-                std::string str((char *) (dynamic_cast<LeafNode *>(node))->leafEntries[i].key + sizeof(int), len);
+                memcpy(&len, (dynamic_cast<InternalNode *>(node))->internalEntries[i].key, sizeof(int));
+                std::string str((char *) (dynamic_cast<InternalNode *>(node))->internalEntries[i].key + sizeof(int), len);
                 out << str << '"';
             }
             if (i != dynamic_cast<InternalNode *>(node)->internalEntries.size() - 1) out << ",";
