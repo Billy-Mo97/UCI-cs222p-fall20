@@ -290,15 +290,18 @@ namespace PeterDB {
             ixFileHandle.bTree->root = nullptr;
             ixFileHandle.bTree->minLeaf = nullptr;
         } else if (rootPageNum != -1 && minLeafPageNum != -1) {
-            Node *rootPointer = new Node();
-            rootPointer->pageNum = rootPageNum;
-            if (ixFileHandle.bTree->loadNode(ixFileHandle, rootPointer) == -1) { return -1; }
-            ixFileHandle.bTree->root = rootPointer;
-
-            Node *minLeafPointer = new Node();
-            minLeafPointer->pageNum = minLeafPageNum;
-            if (ixFileHandle.bTree->loadNode(ixFileHandle, minLeafPointer) == -1) { return -1; }
-            ixFileHandle.bTree->minLeaf = minLeafPointer;
+            if(ixFileHandle.bTree->root == nullptr){
+                Node *rootPointer = new Node();//leak
+                rootPointer->pageNum = rootPageNum;
+                if (ixFileHandle.bTree->loadNode(ixFileHandle, rootPointer) == -1) { return -1; }
+                ixFileHandle.bTree->root = rootPointer;
+            }
+            if(ixFileHandle.bTree->minLeaf == nullptr){
+                Node *minLeafPointer = new Node();
+                minLeafPointer->pageNum = minLeafPageNum;
+                if (ixFileHandle.bTree->loadNode(ixFileHandle, minLeafPointer) == -1) { return -1; }
+                ixFileHandle.bTree->minLeaf = minLeafPointer;
+            }
         }
         free(rootPointerPage);
         return 0;
@@ -362,13 +365,14 @@ namespace PeterDB {
     RC BTree::deleteEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair){
         Node* targetNode = root;
         ixFileHandle.ixReadPageCounter++;
-        if (findLeafNode(ixFileHandle, pair, targetNode) == -1) { return -1; };
+        if (findLeafNode(ixFileHandle, pair, targetNode) == -1) { printf("can't find leafNode\n"); return -1; };
         if (dynamic_cast<LeafNode *>(targetNode)->isLoaded == false) {
-            if (loadNode(ixFileHandle, targetNode) == -1) { return -1; }
+            if (loadNode(ixFileHandle, targetNode) == -1) {printf("can't loadNode\n"); return -1; }
         }
         //If we find pair, delete it
         for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
              i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++) {
+            std::cout<<"key:"<<(*(int*)(*i).key)<<std::endl;
             if (PeterDB::IndexManager::instance().compareKey(attrType, pair.key, (*i).key) == 0) {
                 if(pair.rid.pageNum == (*i).rid.pageNum && pair.rid.slotNum == (*i).rid.slotNum){
                     dynamic_cast<LeafNode *>(targetNode)->leafEntries.erase(i);
@@ -378,6 +382,7 @@ namespace PeterDB {
                 }
             }
         }
+        std::cout<<"can't find key:"<<(*(int*)pair.key)<<", rid:("<<pair.rid.pageNum<<","<<pair.rid.slotNum<<")\n";
         return -1;
     }
 
@@ -403,6 +408,7 @@ namespace PeterDB {
         }
         return 0;
     }
+
 
     RC IndexManager::printLeafKey(int start, int i, Node *node, const Attribute &attribute, std::ostream &out) {
         //This is a helper function to print out the key in "start" entry, and all rids with this key.
@@ -453,7 +459,7 @@ namespace PeterDB {
                     if (printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
                     start = i;
                     entry = dynamic_cast<LeafNode *>(node)->leafEntries[i];
-                    if (i == dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",";
+                    if (i != dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",";
                 }
             }
         }
@@ -468,16 +474,16 @@ namespace PeterDB {
             out << '"';
             if (attribute.type == TypeInt) {
                 int key;
-                memcpy(&key, (char *) (dynamic_cast<LeafNode *>(node))->leafEntries[i].key, sizeof(int));
+                memcpy(&key, (char *) (dynamic_cast<InternalNode *>(node))->internalEntries[i].key, sizeof(int));
                 out << key << '"';
             } else if (attribute.type == TypeReal) {
                 float key;
-                memcpy(&key, (char *) (dynamic_cast<LeafNode *>(node))->leafEntries[i].key, sizeof(float));
+                memcpy(&key, (char *) (dynamic_cast<InternalNode *>(node))->internalEntries[i].key, sizeof(float));
                 out << key << '"';
             } else if (attribute.type == TypeVarChar) {
-                int len;
-                memcpy(&len, (dynamic_cast<LeafNode *>(node))->leafEntries[i].key, sizeof(int));
-                std::string str((char *) (dynamic_cast<LeafNode *>(node))->leafEntries[i].key + sizeof(int), len);
+                int len = *(int*)(dynamic_cast<InternalNode *>(node))->internalEntries[i].key;//std::cout<<"len:"<<len<<std::endl;
+                //memcpy(&len, (dynamic_cast<LeafNode *>(node))->leafEntries[i].key, sizeof(unsigned int));
+                std::string str((char *) (dynamic_cast<InternalNode *>(node))->internalEntries[i].key + sizeof(int), len);
                 out << str << '"';
             }
             if (i != dynamic_cast<InternalNode *>(node)->internalEntries.size() - 1) out << ",";
@@ -1378,7 +1384,9 @@ namespace PeterDB {
             targetNode->sizeInPage -= entrySizeInPage;
             newNode->sizeInPage += entrySizeInPage;
         }
-
+        for(auto i=targetNode->leafEntries.begin()+mid;i<targetNode->leafEntries.end();i++){
+            free((*i).key);
+        }
         //Delete the moved entries from old node.
         targetNode->leafEntries.erase(targetNode->leafEntries.begin() + mid, targetNode->leafEntries.end());
 
@@ -1619,7 +1627,7 @@ namespace PeterDB {
                 newChildEntry = nullptr;
                 return 0;
             } else {
-                LeafNode *newLeafNode;
+                LeafNode *newLeafNode = nullptr;
                 if (splitLeafNode(ixFileHandle, entry, reinterpret_cast<LeafNode *&>(nodePointer), newLeafNode, newChildEntry) == -1) { return -1; }
                 //std::cout << "newChildEntry left :" << newChildEntry->left->pageNum << std::endl;
                 //std::cout << "newChildEntry right :" << newChildEntry->right->pageNum << std::endl;
@@ -1642,7 +1650,7 @@ namespace PeterDB {
                     newChildEntry = nullptr;
                     return 0;
                 } else {
-                    InternalNode *newInternalNode;
+                    InternalNode *newInternalNode = nullptr;
                     if (splitInternalNode(ixFileHandle, dynamic_cast<InternalNode *>(nodePointer), newInternalNode, newChildEntry) == -1) {
                         return -1;
                     }
@@ -1685,11 +1693,16 @@ namespace PeterDB {
         root = nullptr;
         minLeaf = nullptr;
         attrType = TypeNull;
+        for(auto item:nodeMap){
+            if(item.second) delete item.second;
+        }
         nodeMap.clear();
     };
 
     LeafNode::~LeafNode() {
         for (auto entry : leafEntries) {
+            if(rightPointer != nullptr) delete rightPointer;
+            if(overflowPointer != nullptr) delete overflowPointer;
             free(entry.key);
         }
         leafEntries.clear();
@@ -1705,6 +1718,8 @@ namespace PeterDB {
 
     InternalNode::~InternalNode() {
         for (auto entry : internalEntries) {
+            if(entry.left != nullptr) delete entry.left;
+            if(entry.right != nullptr) delete entry.right;
             free(entry.key);
         }
         internalEntries.clear();
