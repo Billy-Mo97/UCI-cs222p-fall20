@@ -431,6 +431,7 @@ namespace PeterDBTesting {
 
         // Insert entries
         generateAndInsertEntries(numOfEntries, ageAttr, seed, salt);
+        int rootPageNum = ixFileHandle.bTree->root->pageNum;
 
         // Scan
         ASSERT_EQ(ix.scan(ixFileHandle, ageAttr, NULL, NULL, true, true, ix_ScanIterator), success)
@@ -450,14 +451,17 @@ namespace PeterDBTesting {
 
         // Delete some tuples
         unsigned deletedRecordNum = 0;
+        rootPageNum = ixFileHandle.bTree->root->pageNum;
 
         for (unsigned i = 5; i <= numOfEntries; i += 10) {
             key = i + seed;
             rid.pageNum = (unsigned) (key * salt + seed) % INT_MAX;
             rid.slotNum = (unsigned) (key * salt * seed + seed) % SHRT_MAX;
 
+            //std::cout << "Deleting " << i << " th entry.\n";
+
             ASSERT_EQ(ix.deleteEntry(ixFileHandle, ageAttr, &key, rid), success)
-                                        << "indexManager::deleteEntry() should succeed.";
+                                        << "indexManager::deleteEntry() on " << i << " th entry should succeed.";
 
             deletedRecordNum += 1;
             if (deletedRecordNum % 20000 == 0) {
