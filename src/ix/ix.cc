@@ -373,15 +373,17 @@ namespace PeterDB {
         //If we find pair, delete it
         for (auto i = dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
              i < dynamic_cast<LeafNode *>(targetNode)->leafEntries.end(); i++) {
+            int pos = i - dynamic_cast<LeafNode *>(targetNode)->leafEntries.begin();
+            if((*i).isDeleted) continue;
             int pairPageNum = pair.rid.pageNum;
             short pairSlotNum = pair.rid.slotNum;
             int iPageNum = (*i).rid.pageNum;
             int iSlotNum = (*i).rid.slotNum;
             if (PeterDB::IndexManager::instance().compareKey(attrType, pair.key, (*i).key) == 0) {
                 if(pair.rid.pageNum == (*i).rid.pageNum && pair.rid.slotNum == (*i).rid.slotNum){
-                    dynamic_cast<LeafNode *>(targetNode)->leafEntries.erase(i);
-                    dynamic_cast<LeafNode *>(targetNode)->sizeInPage -= pair.keySize + sizeof(RID) + sizeof(short);
-                    writeLeafNodeToFile(ixFileHandle, targetNode);
+                    dynamic_cast<LeafNode *>(targetNode)->sizeInPage -= pair.keySize + sizeof(RID);
+                    deleteEntryInFile(ixFileHandle, targetNode, pos);
+                    (*i).isDeleted = true;
                     return 0;
                 }
             }
@@ -389,6 +391,66 @@ namespace PeterDB {
         return -1;
     }
 
+    bool BTree::isEntryDeleted(IXFileHandle &ixFileHandle, Node *targetNode,int i) {
+
+        char *newPage = (char *) calloc(PAGE_SIZE, 1);
+        if (ixFileHandle.readPage(targetNode->pageNum, newPage) == -1) { return -1; }
+        short offset;
+        memcpy(&offset,newPage + PAGE_SIZE - sizeof(short) * (i + 2), sizeof(short));
+        if(offset == -1) return true;
+        return false;
+    }
+
+    void shiftSlots(short targetOffset, short begin, short end, char *&page, Node *targetNode) {
+        //find first undeleted slot in [begin, end)
+        bool flag = false;
+        short beginOffset, endOffset, endSlotSize;
+        for (short i = begin; i < end; i++) {
+            memcpy(&beginOffset, page + PAGE_SIZE - sizeof(short) * (i + 2), sizeof(short));
+            if (beginOffset != -1) {
+                flag = true;
+                break;
+            }
+        }
+        if (!flag) { return; }
+        //find last undeleted slot in [begin, end)
+        for (short i = end - 1; i >= begin; i--) {
+            memcpy(&endOffset, page + PAGE_SIZE - sizeof(short) * (i + 2), sizeof(short));
+            if (endOffset != -1) { break; }
+        }
+        int size = dynamic_cast<LeafNode *>(targetNode)->leafEntries.size();
+        endSlotSize = dynamic_cast<LeafNode *>(targetNode)->leafEntries[size-1].keySize + sizeof(RID);
+        short shiftLength = endOffset + endSlotSize - beginOffset;
+        memmove(page + targetOffset, page + beginOffset, shiftLength);
+        short changeOffset = targetOffset - beginOffset;
+        for (short i = begin; i < end; i++) {
+            short tmp;
+            memcpy(&tmp, page + PAGE_SIZE - sizeof(short) * (i + 2), sizeof(short));
+            if (tmp != -1) {
+                tmp += changeOffset;
+                memcpy(page + PAGE_SIZE - sizeof(short) * (i + 2), &tmp, sizeof(short));
+            }
+        }//std::cout<<"shift slots to:"<<targetOffset<<std::endl;
+    }
+
+    RC BTree::deleteEntryInFile(IXFileHandle &ixFileHandle, Node *targetNode,int i) {
+        char *newPage = (char *) calloc(PAGE_SIZE, 1);
+        if (generatePage(targetNode, newPage) == -1) { return -1; }
+        int deleteFlag = -1;
+        short offset;
+        memcpy(&offset,newPage + PAGE_SIZE - sizeof(short) * (i + 2), sizeof(short));
+        if(offset == -1) return 0;
+        memcpy(newPage + PAGE_SIZE - sizeof(short) * (i + 2), &deleteFlag, sizeof(short));
+        int slotCount = dynamic_cast<LeafNode *>(targetNode)->leafEntries.size();
+        if (i < slotCount - 1) {
+            //int shiftDirSize = 2 * sizeof(short) * (slotCount - 1 - slotNum);
+            //short shiftStart = PAGE_SIZE - sizeof(short) * (slotNum * 2 + 4)
+            shiftSlots(offset, i + 1, slotCount, newPage, targetNode);
+        }
+        if (ixFileHandle.writePage(dynamic_cast<LeafNode *>(targetNode)->pageNum, newPage) == -1) { return -1; }
+        free(newPage);
+        return 0;
+    }
     RC
     IndexManager::deleteEntry(IXFileHandle &ixFileHandle, const Attribute &attribute, const void *key, const RID &rid) {
         //printf("start deleteEntry\n");
@@ -438,7 +500,15 @@ namespace PeterDB {
         int start = 0;
         int entrySize = dynamic_cast<LeafNode *>(node)->leafEntries.size();
         if(entrySize == 0) return 0;
-        LeafEntry entry = dynamic_cast<LeafNode *>(node)->leafEntries[0];
+        LeafEntry entry; bool notDeleted = false;
+        for (int i = 0; i < dynamic_cast<LeafNode *>(node)->leafEntries.size(); i++) {
+            entry = dynamic_cast<LeafNode *>(node)->leafEntries[i];
+            if(entry.isDeleted == false){
+                notDeleted = true;
+                break;
+            }
+        }
+        if(!notDeleted) return 0;
         //Starting from the first entry in the node, print out the keys and rids.
         for (int i = 0; i <= dynamic_cast<LeafNode *>(node)->leafEntries.size(); i++) {
             if (i == dynamic_cast<LeafNode *>(node)->leafEntries.size()) {
@@ -453,7 +523,7 @@ namespace PeterDB {
                     if (printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
                     start = i;
                     entry = dynamic_cast<LeafNode *>(node)->leafEntries[i];
-                    if (i != dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",";
+                    if (i != dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",\n";
                 }
             }
         }
@@ -497,7 +567,7 @@ namespace PeterDB {
         }
         out << "{";
         out << "\"keys\":";
-        out << "[";
+        out << "[\n";
 
         //If current node is a leaf node, print it.
         if (node->type == LEAF) {
@@ -726,11 +796,20 @@ namespace PeterDB {
         memcpy(&entryCount, pageData + PAGE_SIZE - sizeof(short), sizeof(short));
         short entrySlotOffset;
         memcpy(&entrySlotOffset, pageData + PAGE_SIZE - (sizeof(short) + (curEntryIndex + 1) * sizeof(short)), sizeof(short));
-
+        while(entrySlotOffset == -1){
+            curEntryIndex++;
+            if (curEntryIndex >= entryCount) {
+                curEntryIndex = 0;
+                curPageNum = rightPageNum;
+                //getLeafEntryFromPage(pageData, rightPageNum, entryCount, rid, key);
+            }
+            memcpy(&entrySlotOffset, pageData + PAGE_SIZE - sizeof(short) * (curEntryIndex + 2), sizeof(short));
+        }
         //Finally, go to the entry offset and get the key and rid of entry.
         short keyLen;
         if (getKeyLen(pageData, entrySlotOffset, keyLen) == -1) { return -1; }
         memcpy(key, pageData + entrySlotOffset, keyLen);
+        //std::cout<<"key:"<<*(int*)key<<" ";
         memcpy(&rid.pageNum, pageData + entrySlotOffset + keyLen, sizeof(PageNum));
         memcpy(&rid.slotNum, pageData + entrySlotOffset + keyLen + sizeof(PageNum), sizeof(short));
 
@@ -766,9 +845,18 @@ namespace PeterDB {
                 if (idm.compareKey(type, key, highKey) >= 0) { return IX_EOF; }
             }
         }
-
+//        short offset;
+//        memcpy(&offset, pageData + PAGE_SIZE - sizeof(short) * (curEntryIndex + 2), sizeof(short));
+//        while(offset == -1){
+//            curEntryIndex++;
+//            if (curEntryIndex >= entryCount - 1) {
+//                curEntryIndex = 0;
+//                curPageNum = nextPageNum;
+//            }
+//            memcpy(&offset, pageData + PAGE_SIZE - sizeof(short) * (curEntryIndex + 2), sizeof(short));
+//        }
         // Set curEntryIndex and curPageNum.
-        if (curEntryIndex == entryCount - 1) {
+        if (curEntryIndex >= entryCount - 1) {
             curEntryIndex = 0;
             curPageNum = nextPageNum;
         } else {
@@ -911,16 +999,22 @@ namespace PeterDB {
         memcpy(page + PAGE_SIZE - sizeof(short), &slotCount, sizeof(short));
 
         for (int i = 0; i < slotCount; i++) {
-            //set entry offset
-            memcpy(page + PAGE_SIZE - (i + 2) * sizeof(short), &offset, sizeof(short));
-            //set entry key
-            setLeafEntryKeyInPage(node, page, offset, i);
-            //set rid
-            PageNum pageNum = dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.pageNum;
-            memcpy(page + offset, &dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.pageNum, sizeof(PageNum));
-            offset += sizeof(PageNum);
-            memcpy(page + offset, &dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.slotNum, sizeof(short));
-            offset += sizeof(short);
+            if(dynamic_cast<LeafNode *>(node)->leafEntries[i].isDeleted == false){
+                //set entry offset
+                memcpy(page + PAGE_SIZE - (i + 2) * sizeof(short), &offset, sizeof(short));
+                //set entry key
+                setLeafEntryKeyInPage(node, page, offset, i);
+                //set rid
+                PageNum pageNum = dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.pageNum;
+                memcpy(page + offset, &dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.pageNum, sizeof(PageNum));
+                offset += sizeof(PageNum);
+                memcpy(page + offset, &dynamic_cast<LeafNode *>(node)->leafEntries[i].rid.slotNum, sizeof(short));
+                offset += sizeof(short);
+            }else{
+                short deletedFlag = -1;
+                //set entry offset
+                memcpy(page + PAGE_SIZE - (i + 2) * sizeof(short), &deletedFlag, sizeof(short));
+            }
         }
 
         return 0;
@@ -1058,13 +1152,19 @@ namespace PeterDB {
         for (int i = 0; i < slotCount; i++) {
             short slotOffset;
             memcpy(&slotOffset, data + PAGE_SIZE - (i + 2) * sizeof(short), sizeof(short));
-            short keyLen = 0;
-            if (getKeyLen(data, offset, keyLen) == -1) { return -1; }
-            RID rid;
-            memcpy(&rid.pageNum, data + slotOffset + keyLen, sizeof(PageNum));
-            memcpy(&rid.slotNum, data + slotOffset + keyLen + sizeof(PageNum), sizeof(short));
-            LeafEntry entry(attrType, data + slotOffset, rid);
-            dynamic_cast<LeafNode *>(res)->leafEntries.push_back(entry);
+            if(slotOffset == -1){
+                LeafEntry deletedEntry;
+                deletedEntry.isDeleted = true;
+                dynamic_cast<LeafNode *>(res)->leafEntries.push_back(deletedEntry);
+            }else{
+                short keyLen = 0;
+                if (getKeyLen(data, offset, keyLen) == -1) { return -1; }
+                RID rid;
+                memcpy(&rid.pageNum, data + slotOffset + keyLen, sizeof(PageNum));
+                memcpy(&rid.slotNum, data + slotOffset + keyLen + sizeof(PageNum), sizeof(short));
+                LeafEntry entry(attrType, data + slotOffset, rid);
+                dynamic_cast<LeafNode *>(res)->leafEntries.push_back(entry);
+            }
         }
         return 0;
     }
@@ -1309,7 +1409,15 @@ namespace PeterDB {
         int insertedIndex = -1;
         // If we find pair's key less than one entry's key, insert it before that entry.
         for (auto i = targetNode->leafEntries.begin(); i < targetNode->leafEntries.end(); i++) {
+            if((*i).isDeleted == true) continue;
             if (idm.compareKey(attrType, entry.key, (*i).key) < 0) {
+                if(i!=targetNode->leafEntries.begin()&& (*(i-1)).isDeleted){
+                    *(i-1) = entry;
+                    (*(i-1)).isDeleted =false;
+                    isAdded = true;
+                    insertedIndex = i - 1 - targetNode->leafEntries.begin();
+                    break;
+                }
                 targetNode->leafEntries.insert(i, entry);
                 isAdded = true;
                 insertedIndex = i - targetNode->leafEntries.begin();
@@ -1318,8 +1426,14 @@ namespace PeterDB {
         }
         // Otherwise, push it to the back of vector of entries.
         if (isAdded == false) {
-            targetNode->leafEntries.push_back(entry);
-            insertedIndex = targetNode->leafEntries.size() - 1;
+            if(targetNode->leafEntries.size()>0 && targetNode->leafEntries[targetNode->leafEntries.size()-1].isDeleted){
+                targetNode->leafEntries[targetNode->leafEntries.size()-1] = entry;
+                targetNode->leafEntries[targetNode->leafEntries.size()-1].isDeleted = false;
+                insertedIndex = targetNode->leafEntries.size() - 1;
+            }else{
+                targetNode->leafEntries.push_back(entry);
+                insertedIndex = targetNode->leafEntries.size() - 1;
+            }
         }
 
         int sizeAterInsertion = targetNode->leafEntries.size();
@@ -1329,6 +1443,7 @@ namespace PeterDB {
 
         // Write the updated leaf node into index file.
         char *newPage = (char *) calloc(PAGE_SIZE, 1);
+
         if (generatePage(targetNode, newPage) == -1) { return -1; }
         if (ixFileHandle.writePage(targetNode->pageNum, newPage) == -1) { return -1; }
         free(newPage);
@@ -1742,8 +1857,8 @@ namespace PeterDB {
 
     InternalNode::InternalNode() {
         type = INTERNAL;
-        //sizeInPage consists of type(char), sizeInPage(short), parent(PageNum), slotCount(short)
-        sizeInPage = sizeof(char) + sizeof(short) + sizeof(PageNum) + sizeof(short);
+        //sizeInPage consists of type(char), sizeInPage(short), slotCount(short)
+        sizeInPage = sizeof(char) + sizeof(short) + sizeof(short);
         parent = nullptr;
         pageNum = -1;
         isDirty = false;
@@ -1752,8 +1867,8 @@ namespace PeterDB {
 
     LeafNode::LeafNode() {
         type = LEAF;
-        //sizeInPage consists of type(char), sizeInPage(short), parent(PageNum), rightPointer(PageNum), overflowPointer(PageNum), slotCount(short)
-        sizeInPage = sizeof(char) + sizeof(short) + 3 * sizeof(PageNum) + sizeof(short);
+        //sizeInPage consists of type(char), sizeInPage(short),rightPointer(PageNum), overflowPointer(PageNum), slotCount(short)
+        sizeInPage = sizeof(char) + sizeof(short) + 2 * sizeof(PageNum) + sizeof(short);
         parent = nullptr;
         pageNum = -1;
         isDirty = false;
@@ -1764,6 +1879,7 @@ namespace PeterDB {
 
     LeafEntry::LeafEntry() {
         key = nullptr;
+        isDeleted = false;
         rid.pageNum = -1;
         rid.slotNum = -1;
         keySize = 0;
@@ -1785,11 +1901,13 @@ namespace PeterDB {
             keySize = sizeof(int) + strLen;
         }
         this->rid = ridPassed;
+        isDeleted = false;
     }
 
     LeafEntry::~LeafEntry() {
         //free(key);
         key = nullptr;
+        isDeleted = false;
         rid.pageNum = -1;
         rid.slotNum = -1;
         keySize = 0;
