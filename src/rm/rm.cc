@@ -603,7 +603,7 @@ namespace PeterDB {
     RC RelationManager::insertTuple(const std::string &tableName, const void *data, RID &rid) {
         //Pre-check: check whether catalog tables exists.
         if (checkCatalog() == -1) { return -1; }
-
+        if(tableName == "Tables" || tableName == "Columns") return -1;
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;
@@ -623,7 +623,7 @@ namespace PeterDB {
     RC RelationManager::deleteTuple(const std::string &tableName, const RID &rid) {
         //Pre-check: check whether catalog tables exists.
         if (checkCatalog() == -1) { return -1; }
-
+        if(tableName == "Tables" || tableName == "Columns") return -1;
         //First, get the tableId and fileName from catalog.
         int tableId;
         std::string fileName;

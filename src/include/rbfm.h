@@ -14,7 +14,7 @@ namespace PeterDB {
 
     // Attribute
     typedef enum {
-        TypeInt = 0, TypeReal, TypeVarChar
+        TypeInt = 0, TypeReal, TypeVarChar, TypeNull
     } AttrType;
 
     typedef unsigned AttrLength;
