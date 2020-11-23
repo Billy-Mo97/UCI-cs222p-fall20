@@ -460,7 +460,7 @@ namespace PeterDB {
                     if (printLeafKey(start, i, node, attribute, out) == -1) { return -1; }
                     start = i;
                     entry = dynamic_cast<LeafNode *>(node)->leafEntries[i];
-                    if (i != dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",";
+                    if (i != dynamic_cast<LeafNode *>(node)->leafEntries.size()) out << ",\n";
                 }
             }
         }
@@ -502,7 +502,7 @@ namespace PeterDB {
         }
         out << "{";
         out << "\"keys\":";
-        out << "[";
+        out << "[\n";
 
         //If current node is a leaf node, print it.
         if (node->type == LEAF) {
@@ -514,8 +514,8 @@ namespace PeterDB {
             if (printInternalNode(ixFileHandle, node, attribute, out) == -1) { return -1; }
             out << "]";
             //print its children.
-            out << ",";
-            out << "\"children\":[";
+            out << ",\n";
+            out << "\"children\":[\n";
             for (int i = 0; i < dynamic_cast<InternalNode *>(node)->internalEntries.size(); i++) {
                 //For each internal node's entry, do DFS search on its left child.
                 if (DFS(ixFileHandle, dynamic_cast<InternalNode *>(node)->internalEntries[i].left, attribute, out) ==
@@ -1730,8 +1730,8 @@ namespace PeterDB {
 
     InternalNode::InternalNode() {
         type = INTERNAL;
-        //sizeInPage consists of type(char), sizeInPage(short), parent(PageNum), slotCount(short)
-        sizeInPage = sizeof(char) + sizeof(short) + sizeof(PageNum) + sizeof(short);
+        //sizeInPage consists of type(char), sizeInPage(short), slotCount(short)
+        sizeInPage = sizeof(char) + sizeof(short) + sizeof(short);
         parent = nullptr;
         pageNum = -1;
         isDirty = false;
@@ -1740,8 +1740,8 @@ namespace PeterDB {
 
     LeafNode::LeafNode() {
         type = LEAF;
-        //sizeInPage consists of type(char), sizeInPage(short), parent(PageNum), rightPointer(PageNum), overflowPointer(PageNum), slotCount(short)
-        sizeInPage = sizeof(char) + sizeof(short) + 3 * sizeof(PageNum) + sizeof(short);
+        //sizeInPage consists of type(char), sizeInPage(short),rightPointer(PageNum), overflowPointer(PageNum), slotCount(short)
+        sizeInPage = sizeof(char) + sizeof(short) + 2 * sizeof(PageNum) + sizeof(short);
         parent = nullptr;
         pageNum = -1;
         isDirty = false;
