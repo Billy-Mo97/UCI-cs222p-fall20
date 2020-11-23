@@ -340,10 +340,11 @@ namespace PeterDB {
             }
             if (ixFileHandle.bTree->initiateNullTree(ixFileHandle) == -1) { return -1; }
             InternalEntry *newChildEntry = nullptr;
+            int rootPageNum = ixFileHandle.bTree->root->pageNum;
             if (ixFileHandle.bTree->insertEntry(ixFileHandle, ixFileHandle.bTree->root, leafEntry, newChildEntry) == -1) { return -1; }
         } else {
             InternalEntry *newChildEntry = nullptr;
-            //std::cout << "Inserting entry, root: " << ixFileHandle.bTree->root->pageNum << std::endl;
+            int rootPageNum = ixFileHandle.bTree->root->pageNum;
             if (ixFileHandle.bTree->insertEntry(ixFileHandle, ixFileHandle.bTree->root, leafEntry, newChildEntry) == -1) { return -1; }
         }
         if (ixFileHandle.writeRootPointerPage() == -1) { return -1; }
@@ -398,15 +399,7 @@ namespace PeterDB {
             ixFileHandle.bTree->attrType = attribute.type;
             if (ixFileHandle.bTree->deleteEntry(ixFileHandle, leafEntry) == -1) { return -1; }
         } else {
-            ixFileHandle.bTree = new BTree();
-            ixFileHandle.bTree->attrType = attribute.type;
-            //If root is null, append a new root page.
-            if (ixFileHandle.root == NULLNODE) {
-                return -1;
-            } else {
-                if (setRoot(ixFileHandle) == -1) { return -1; }
-            }
-            if (ixFileHandle.bTree->deleteEntry(ixFileHandle, leafEntry) == -1) { return -1; }
+            return -1;
         }
         return 0;
     }
@@ -495,6 +488,8 @@ namespace PeterDB {
     RC IndexManager::DFS(IXFileHandle &ixFileHandle, Node *node, const Attribute &attribute, std::ostream &out) const {
         //Do breadth-first search on B+tree, starting on given node.
         //If the node is not loaded, load it into memory.
+
+        //Debug
         if (node->isLoaded == false) {
             if (ixFileHandle.bTree->loadNode(ixFileHandle, node) == -1) {
                 return -1;
@@ -506,6 +501,7 @@ namespace PeterDB {
 
         //If current node is a leaf node, print it.
         if (node->type == LEAF) {
+            //std::string str((char *) (dynamic_cast<LeafNode *>(node))->leafEntries[0].key + sizeof(int), 1);
             if (leafDFS(ixFileHandle, node, attribute, out) == -1) { return -1; }
             out << "]";
         } else {
@@ -514,17 +510,18 @@ namespace PeterDB {
             if (printInternalNode(ixFileHandle, node, attribute, out) == -1) { return -1; }
             out << "]";
             //print its children.
-            out << ",";
-            out << "\"children\":[";
+            out << ",\n";
+            out << "\"children\":[\n";
             for (int i = 0; i < dynamic_cast<InternalNode *>(node)->internalEntries.size(); i++) {
                 //For each internal node's entry, do DFS search on its left child.
                 if (DFS(ixFileHandle, dynamic_cast<InternalNode *>(node)->internalEntries[i].left, attribute, out) ==
                     -1) { return -1; }
-                out << ",";
+                out << ",\n";
                 //If it is the last entry on its node, do DFS search on its right child.
                 if (i == dynamic_cast<InternalNode *>(node)->internalEntries.size() - 1) {
                     if (DFS(ixFileHandle, dynamic_cast<InternalNode *>(node)->internalEntries[i].right, attribute,
                             out) == -1) { return -1; }
+                    out << "\n";
                 }
             }
             out << "]";
@@ -537,7 +534,6 @@ namespace PeterDB {
         //if (ixFileHandle.readRootPointerPage() == -1) { return -1; }
         if (getRootAndMinLeaf(ixFileHandle) == -1) { return -1; }
         //if (getMinLeaf(ixFileHandle) == -1) { return -1; }
-        PageNum rootPageNum = ixFileHandle.bTree->root->pageNum;
         return DFS(ixFileHandle, ixFileHandle.bTree->root, attribute, out);
     }
 
@@ -1510,6 +1506,12 @@ namespace PeterDB {
     RC BTree::insertEntryInInternalNode(IXFileHandle ixFileHandle, InternalNode *targetNode,
                                         InternalEntry *newChildEntry) {
         PeterDB::IndexManager &idm = PeterDB::IndexManager::instance();
+        char v1 = 0, v2 = 0;
+        if (newChildEntry->left->type == LEAF) {
+            memcpy(&v1, (char *)dynamic_cast<LeafNode *>(newChildEntry->left)->leafEntries[0].key + sizeof(int), 1);
+            memcpy(&v2, (char *)dynamic_cast<LeafNode *>(newChildEntry->right)->leafEntries[0].key + sizeof(int), 1);
+        }
+
         InternalEntry insertEntry(ixFileHandle.bTree->attrType, newChildEntry->key, newChildEntry->left, newChildEntry->right);
         delete newChildEntry;
 
@@ -1520,9 +1522,9 @@ namespace PeterDB {
         int addedIndex = 0;
         for (auto i = targetNode->internalEntries.begin(); i != targetNode->internalEntries.end(); i++) {
             if (idm.compareKey(attrType, insertEntry.key, (*i).key) < 0) {
+                addedIndex = i - targetNode->internalEntries.begin();
                 targetNode->internalEntries.insert(i, insertEntry);
                 isAdded = true;
-                addedIndex = i - targetNode->internalEntries.begin();
                 break;
             }
         }
@@ -1560,9 +1562,9 @@ namespace PeterDB {
         int addedIndex = 0;
         for (auto i = targetNode->internalEntries.begin(); i != targetNode->internalEntries.end(); i++) {
             if (idm.compareKey(attrType, insertEntry.key, (*i).key) < 0) {
+                addedIndex = i - targetNode->internalEntries.begin();
                 targetNode->internalEntries.insert(i, insertEntry);
                 isAdded = true;
-                addedIndex = i - targetNode->internalEntries.begin();
                 break;
             }
         }
@@ -1626,6 +1628,8 @@ namespace PeterDB {
     RC BTree::insertEntry(IXFileHandle &ixFileHandle, Node *nodePointer, LeafEntry &entry, InternalEntry *&newChildEntry) {
         if (ixFileHandle.bTree->loadNode(ixFileHandle, nodePointer) == -1) { return -1; }
         if (nodePointer->type == LEAF) {
+            char value;
+            memcpy(&value, (char *)entry.key + sizeof(int), 1);
             if (checkLeafNodeSpaceForInsertion(dynamic_cast<LeafNode *>(nodePointer), entry)) {
                 if (insertEntryInLeafNode(dynamic_cast<LeafNode *>(nodePointer), ixFileHandle, entry) == -1) { return -1; }
                 newChildEntry = nullptr;
@@ -1635,6 +1639,10 @@ namespace PeterDB {
                 if (splitLeafNode(ixFileHandle, entry, reinterpret_cast<LeafNode *&>(nodePointer), newLeafNode, newChildEntry) == -1) { return -1; }
                 //std::cout << "newChildEntry left :" << newChildEntry->left->pageNum << std::endl;
                 //std::cout << "newChildEntry right :" << newChildEntry->right->pageNum << std::endl;
+                char v1;
+                memcpy(&v1, (char *)dynamic_cast<LeafNode *>(newChildEntry->left)->leafEntries[0].key + sizeof(int), 1);
+                char v2;
+                memcpy(&v2, (char *)dynamic_cast<LeafNode *>(newChildEntry->right)->leafEntries[0].key + sizeof(int), 1);
                 if (ixFileHandle.bTree->root == nodePointer) {
                     if (createNewRoot(ixFileHandle, newChildEntry) == -1) { return -1; }
                 }
@@ -1658,6 +1666,10 @@ namespace PeterDB {
                     if (splitInternalNode(ixFileHandle, dynamic_cast<InternalNode *>(nodePointer), newInternalNode, newChildEntry) == -1) {
                         return -1;
                     }
+                    char v1;
+                    memcpy(&v1, (char *)dynamic_cast<InternalNode *>(newChildEntry->left)->internalEntries[0].key + sizeof(int), 1);
+                    char v2;
+                    memcpy(&v2, (char *)dynamic_cast<InternalNode *>(newChildEntry->right)->internalEntries[0].key + sizeof(int), 1);
                     if (ixFileHandle.bTree->root == nodePointer) {
                         if (createNewRoot(ixFileHandle, newChildEntry) == -1) { return -1; }
                     }

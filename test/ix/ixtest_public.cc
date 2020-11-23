@@ -1,10 +1,11 @@
 #include <random>
+#include <string>
 
 #include "src/include/ix.h"
 #include "test/utils/ix_test_utils.h"
 
 namespace PeterDBTesting {
-    /*TEST_F(IX_File_Test, create_open_close_destory_index) {
+    TEST_F(IX_File_Test, create_open_close_destory_index) {
         // Functions tested
         // 1. Create Index File
         // 2. Open Index File
@@ -414,7 +415,7 @@ namespace PeterDBTesting {
         // Close Scan
         ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
 
-    }*/
+    }
 
     TEST_F(IX_Test, scan_on_reinserted_entries) {
         // Functions tested
@@ -431,7 +432,6 @@ namespace PeterDBTesting {
 
         // Insert entries
         generateAndInsertEntries(numOfEntries, ageAttr, seed, salt);
-        int rootPageNum = ixFileHandle.bTree->root->pageNum;
 
         // Scan
         ASSERT_EQ(ix.scan(ixFileHandle, ageAttr, NULL, NULL, true, true, ix_ScanIterator), success)
@@ -451,7 +451,6 @@ namespace PeterDBTesting {
 
         // Delete some tuples
         unsigned deletedRecordNum = 0;
-        rootPageNum = ixFileHandle.bTree->root->pageNum;
 
         for (unsigned i = 5; i <= numOfEntries; i += 10) {
             key = i + seed;
@@ -461,7 +460,7 @@ namespace PeterDBTesting {
             //std::cout << "Deleting " << i << " th entry.\n";
 
             ASSERT_EQ(ix.deleteEntry(ixFileHandle, ageAttr, &key, rid), success)
-                                        << "indexManager::deleteEntry() on " << i << " th entry should succeed.";
+                                        << "indexManager::deleteEntry() should succeed.";
 
             deletedRecordNum += 1;
             if (deletedRecordNum % 20000 == 0) {
@@ -590,98 +589,6 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(IX_Test, scan_varchar_with_compact_size) {
-        // Checks whether VARCHAR type is handled properly or not.
-        //
-        // Functions Tested:
-        // 1. Insert Entry
-        // 2. Get Insert IO count
-        // 3. Scan
-        // 4. Get Scan IO count
-        // 5. Close Scan
-
-        unsigned numOfEntries = 500;
-        unsigned numOfMoreEntries = 5;
-        char key[1004];
-        char testedAscii = 107 - 96;
-
-        // insert entries
-        for (unsigned i = 0; i < numOfEntries; i++) {
-            memset(key, 0, 1004);
-            prepareKeyAndRid(i, key, rid);
-
-            ASSERT_EQ(ix.insertEntry(ixFileHandle, empNameAttr, &key, rid), success)
-                                        << "indexManager::insertEntry() should succeed.";
-            std::cout << "Inserting " << i << std::endl;
-            std::cout << key << std::endl;
-            if (i % 100 == testedAscii) {
-                rids.emplace_back(rid);
-            }
-        }
-        // insert more entries
-
-        for (unsigned i = 0; i < numOfMoreEntries; i++) {
-            memset(key, 0, 1004);
-            prepareKeyAndRid(testedAscii, key, rid);
-            rid.slotNum = rid.pageNum +i+1;
-            ASSERT_EQ(ix.insertEntry(ixFileHandle, empNameAttr, &key, rid), success)
-                                        << "indexManager::insertEntry() should succeed.";
-            std::cout << "Inserting " << i+500 << std::endl;
-            rids.emplace_back(rid);
-        }
-
-        // print BTree, by this time the BTree should have only one node
-        std::stringstream stream;
-        ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)
-                                    << "indexManager::printBTree() should succeed.";
-
-        // we give D a very large
-        // (1+n)n/2 <= PAGE_SIZE, thus n >= 2^6.5 =90.5, we would put very loose D as around 45.
-        validateTree(stream, numOfEntries, numOfEntries + numOfMoreEntries, 2,
-                     45, true);
-
-        // collect counter
-        ASSERT_EQ(ixFileHandle.collectCounterValues(rc, wc, ac), success)
-                                    << "indexManager::collectCounterValues() should succeed.";
-
-        // Scan
-        memset(key, 0, 100);
-        prepareKeyAndRid(testedAscii, key, rid);
-        ASSERT_EQ(ix.scan(ixFileHandle, empNameAttr, &key, &key, true, true, ix_ScanIterator), success)
-                                    << "indexManager::scan() should succeed.";
-
-        //iterate
-        int count = 0;
-        while (ix_ScanIterator.getNextEntry(rid, &key) == success) {
-
-            auto target = std::find_if(rids.begin(), rids.end(), [&](const PeterDB::RID &r) {
-                return r.slotNum == rid.slotNum && r.pageNum == rid.pageNum;
-            });
-            EXPECT_NE(target, rids.end()) << "RID is not from inserted.";
-            rids.erase(target);
-            count++;
-            if (count % 20 == 0) {
-                GTEST_LOG_(INFO) << count << " scanned - returned rid: " << rid.pageNum << " " << rid.slotNum;
-            }
-        }
-
-        EXPECT_EQ(rids.size(), 0) << "all RIDs are scanned";
-
-        // collect counters
-        ASSERT_EQ(ixFileHandle.collectCounterValues(rcAfter, wcAfter, acAfter), success)
-                                    << "indexManager::collectCounterValues() should succeed.";
-
-        // check counters
-        EXPECT_GE(rcAfter - rc, 4);
-        // for scan and iteration, at least 4 pages needed (1 tree root pointer, 3 tree nodes)
-        EXPECT_IN_RANGE(wcAfter - wc, 0, 1); // persist counters
-        EXPECT_EQ(acAfter - ac, 0); // no page appended during iteration.
-
-        // Close Scan
-        ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
-
-    }
-
     TEST_F(IX_Test, split_rotate_and_promote_on_insertion) {
         // Checks whether the insertion is implemented correctly (split should happen)
         // Functions tested
@@ -698,41 +605,60 @@ namespace PeterDBTesting {
         std::iota(keys.begin(), keys.end(), 1);
         std::shuffle(keys.begin(), keys.end(), std::mt19937(std::random_device()()));
 
+        //keys[0]='r' - 'a';keys[1]='b' - 'a';keys[2]='i' - 'a';keys[3]='n' - 'a';keys[4]='l' - 'a';keys[5]='g' - 'a';keys[6]='t' - 'a';keys[7]='e' - 'a';keys[8]='k' - 'a';keys[9]='s' - 'a';keys[10]='u' - 'a';keys[11]='j' - 'a';
+        //keys[12]='m' - 'a';keys[13]='o' - 'a';keys[14]='f' - 'a';keys[15]='v' - 'a';keys[16]='p' - 'a';keys[17]='d' - 'a';keys[18]='h' - 'a';keys[19]='q' - 'a';keys[20]='c' - 'a';
+
         // insert entry
         unsigned i = 0;
         for (unsigned &k:keys) {
             i++;
-            //std::cout<<"insert "<<i<<"th entry\n";
             // Prepare a key
             prepareKeyAndRid(k, key, rid, empNameAttr.length);
+            char v;
+            memcpy(&v, (char *)key + sizeof(int), 1);
+            //std::cout << "Inserting " << v << std::endl;
             ASSERT_EQ(ix.insertEntry(ixFileHandle, empNameAttr, &key, rid), success)
                                         << "indexManager::insertEntry() should succeed.";
+
+            //ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, std::cout), success)
+            //                            << "indexManager::printBTree() should succeed";
+
+            //std::cout << "\n\n";
             if (i == 5) {
                 // print BTree, by this time the BTree should have height of 1 - one root (c*) with two leaf nodes
                 // (2 + 3) or (3 + 2)
                 std::stringstream stream;
-                //ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)<< "indexManager::printBTree() should succeed";
-                //ix.printBTree(ixFileHandle, empNameAttr, std::cout);
-                //printf("start to validate\n");
-                //validateTree(stream, 5, 5, 1, 2);
-            }
-            if (i == 13) {
-                // print BTree, by this time the BTree should have height of 1 - one root (c*) with two leaf nodes
-                // (2 + 3) or (3 + 2)
-                std::stringstream stream;
-                ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)<< "indexManager::printBTree() should succeed";
-                //ix.printBTree(ixFileHandle, empNameAttr, std::cout);
-                //printf("start to validate\n");
-                validateTree(stream, 13, 13, 2, 2);
+                ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)
+                                            << "indexManager::printBTree() should succeed";
+                //ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, std::cout), success)
+                //                            << "indexManager::printBTree() should succeed";
+                //std::cout << "\n\n";
+                validateTree(stream, 5, 5, 1, 2);
             }
 
         }
 
+        ASSERT_EQ(ix.scan(ixFileHandle, empNameAttr, NULL, NULL, true, true, ix_ScanIterator), success)
+                                    << "indexManager::scan() should succeed.";
+
+        char keyReturned[PAGE_SIZE];
+        while (ix_ScanIterator.getNextEntry(rid, &keyReturned) == success) {
+            char value;
+            memcpy(&value, (char *)&keyReturned + sizeof(int), 1);
+            //std::cout << value << std::endl;
+
+        }
+
+        //std::cout << "\n\n";
+        ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
+
         // print BTree, by this time the BTree should have height of 2
-//        std::stringstream stream;
-//        ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)
-//                                    << "indexManager::printBTree() should succeed.";
-//        validateTree(stream, numOfEntries, numOfEntries, 2, 2);
+        std::stringstream stream;
+        ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, stream), success)
+                                    << "indexManager::printBTree() should succeed";
+        //ASSERT_EQ(ix.printBTree(ixFileHandle, empNameAttr, std::cout), success)
+        //                            << "indexManager::printBTree() should succeed.";
+        validateTree(stream, numOfEntries, numOfEntries, 2, 2);
 
     }
 //14
@@ -766,7 +692,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(IX_Test, extra_duplicate_keys_span_multiple_pages) {
+    /*TEST_F(IX_Test, extra_duplicate_keys_span_multiple_pages) {
         // Checks whether duplicated entries spanning multiple page are handled properly or not.
         //
         // Functions tested
@@ -884,6 +810,6 @@ namespace PeterDBTesting {
 
         validateTree(stream, 12, 12, 1, 2);
 
-    }
+    }*/
 
 } // namespace PeterDBTesting
