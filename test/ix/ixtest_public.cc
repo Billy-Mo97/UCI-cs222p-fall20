@@ -436,8 +436,8 @@ namespace PeterDBTesting {
         // Scan
         ASSERT_EQ(ix.scan(ixFileHandle, ageAttr, NULL, NULL, true, true, ix_ScanIterator), success)
                                     << "indexManager::scan() should succeed.";
-
-        // Iterate
+//
+//        // Iterate
         unsigned count = 0;
         while (ix_ScanIterator.getNextEntry(rid, &key) == success) {
             count++;
@@ -455,7 +455,7 @@ namespace PeterDBTesting {
 
         for (unsigned i = 5; i <= numOfEntries; i += 10) {
             key = i + seed;
-            rid.pageNum = (unsigned) (key * salt + seed) % INT_MAX;
+            rid.pageNum = (unsigned) (key * salt + seed) % INT_MAX;//salt 21414,seed 581078
             rid.slotNum = (unsigned) (key * salt * seed + seed) % SHRT_MAX;
 
             //std::cout << "Deleting " << i << " th entry.\n";
