@@ -785,7 +785,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC IX_ScanIterator::getLeafEntryFromPage(char *pageData, PageNum &rightPageNum, short &entryCount, RID &rid, void *key) {
+    int IX_ScanIterator::getLeafEntryFromPage(char *pageData, PageNum &rightPageNum, short &entryCount, RID &rid, void *key) {
         //First, get the header information from the page.
         char nodeType;
         short nodeSize;
@@ -801,7 +801,8 @@ namespace PeterDB {
             if (curEntryIndex >= entryCount) {
                 curEntryIndex = 0;
                 curPageNum = rightPageNum;
-                //getLeafEntryFromPage(pageData, rightPageNum, entryCount, rid, key);
+                if (curPageNum == -1) { return 1; }
+                else { return 2; }
             }
             memcpy(&entrySlotOffset, pageData + PAGE_SIZE - sizeof(short) * (curEntryIndex + 2), sizeof(short));
         }
@@ -831,7 +832,12 @@ namespace PeterDB {
 
         PageNum nextPageNum;
         short entryCount;
-        if (getLeafEntryFromPage(pageData, nextPageNum, entryCount, rid, key) == -1) { return -1; }
+        int result = getLeafEntryFromPage(pageData, nextPageNum, entryCount, rid, key);
+        if (result == 1) { return IX_EOF; }
+        else if (result == 2) {
+            free(pageData);
+            return getNextEntry(rid, key);
+        }
 
         //std::cout << "Scanning: page " << curPageNum << std::endl;
         //std::cout << "Scanning, next page: " << nextPageNum << std::endl;

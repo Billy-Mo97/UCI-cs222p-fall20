@@ -118,7 +118,7 @@ namespace PeterDB {
         RC getKeyLen(char *pageData, short &offset, short &keyLen);
 
         // Get leaf entry from leaf page in index file.
-        RC getLeafEntryFromPage(char* pageData, PageNum &rightPageNum, short &entryCount, RID &rid, void *key);
+        int getLeafEntryFromPage(char* pageData, PageNum &rightPageNum, short &entryCount, RID &rid, void *key);
 
         // Get next matching entry
         RC getNextEntry(RID &rid, void *key);
