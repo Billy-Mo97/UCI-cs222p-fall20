@@ -208,12 +208,8 @@ namespace PeterDBTesting {
                 rid.slotNum = (unsigned) (value * salt * seed + seed) % SHRT_MAX;
                 rids.emplace_back(rid);
                 T key = fixedKey == NULL ? value : fixedKey;
-                std::cout << "Inserting " << i << "th entry.\n";
-                if (i == 59859) {
-                    ASSERT_EQ(ix.insertEntry(ixFileHandle, attr, &key, rid), success)
-                                                << "indexManager::insertEntry() should succeed.";
-                    continue;
-                }
+                //std::cout << "Inserting " << i << "th entry.\n";
+
                 ASSERT_EQ(ix.insertEntry(ixFileHandle, attr, &key, rid), success)
                                             << "indexManager::insertEntry() should succeed.";
             }
@@ -257,7 +253,7 @@ namespace PeterDBTesting {
                 EXPECT_LE(root.childrenCount(), 2 * D + 1)
                                     << "number of children should be less than or equal to 2D+1.";
                 if (!isTreeRoot && !allowUnderFit)
-                    EXPECT_GE(root.keyCount(), D) << "number of children should be more than or equal to D.";
+                    EXPECT_GE(root.childrenCount(), D) << "number of children should be more than or equal to D.";
             } else {
                 // leaf node
                 EXPECT_LE(root.keyCount(), 2 * D) << "number of entries should be less than or equal to 2D.";
