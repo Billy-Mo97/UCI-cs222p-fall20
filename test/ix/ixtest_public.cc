@@ -707,7 +707,7 @@ namespace PeterDBTesting {
             prepareKeyAndRid(k, key, rid, empNameAttr.length);
             ASSERT_EQ(ix.insertEntry(ixFileHandle, empNameAttr, &key, rid), success)
                                         << "indexManager::insertEntry() should succeed.";
-            if (i == 10) {
+            if (i == 9) {
                 // print BTree, by this time the BTree should have height of 1 - one root (c*) with two leaf nodes
                 // (2 + 3) or (3 + 2)
                 std::stringstream stream;
@@ -727,7 +727,7 @@ namespace PeterDBTesting {
 //
 //                // Close Scan
 //                ASSERT_EQ(ix_ScanIterator.close(), success) << "IX_ScanIterator::close() should succeed.";
-                validateTree(stream, 10, 10, 1, 2);
+                validateTree(stream, 9, 9, 1, 2);
             }
         }
 

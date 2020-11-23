@@ -191,7 +191,7 @@ namespace PeterDB {
         void *key;
         RID rid;
         short keySize;
-
+        bool isDeleted;
         LeafEntry();
 
         LeafEntry(const AttrType &attrType, const void *key, const RID rid);
@@ -245,9 +245,9 @@ namespace PeterDB {
         BTree();
 
         ~BTree();
-
+        RC deleteEntryInFile(IXFileHandle &ixFileHandle, Node *targetNode,int i);
         RC deleteEntry(IXFileHandle &ixFileHandle, const LeafEntry &pair);
-
+        bool isEntryDeleted(IXFileHandle &ixFileHandle, Node *targetNode,int i);
         RC generateRootNode(LeafNode *&res);
 
         RC initiateNullTree(IXFileHandle &ixFileHandle);
@@ -321,23 +321,6 @@ namespace PeterDB {
         RC generateNode(char *data, Node *&res);
 
         RC getMaxLeaf(LeafNode *maxLeafNode);
-        //int compareKey(void* v1, void* v2);
-//        RC deleteEntry(IXFileHandle &ixfileHandle, const LeafEntry &pair);
-//        RC findRecord(IXFileHandle &ixfileHandle, const LeafEntry &pair, std::vector<LeafEntry>::iterator &result);
-//        RC findLeaf(IXFileHandle &ixfileHandle, const LeafEntry &pair, LeafNode** &result);
-
-//        int compareEntry(const LeafEntry &pair1, const LeafEntry &pair2);
-//        RC doDelete(IXFileHandle &ixfileHandle, Node** node, const LeafEntry &pair);
-//        RC removeEntryFromNode(Node** node, const LeafEntry &pair);
-//        short getEntrySize(int nodeType, const LeafEntry &pair, bool isLastEntry);
-//        RC adjustRoot(IXFileHandle &ixfileHandle);
-//        RC getNeighborIndex(Node** node, int &result);
-//        RC getNodesMergeSize(Node** node1, Node** node2, short sizeOfParentKey, short &result);
-//        short getKeySize(const void* key);
-//        RC mergeNodes(IXFileHandle &ixfileHandle, Node** node, Node** neighbor, int neighborIndex, int keyIndex, short mergedNodeSize);
-//        RC redistributeNodes(Node** node, Node** neighbor, int neighborIndex, int keyIndex, short keySize);
-//        RC refreshNodeSize(Node** node);
-//        RC writeNodesBack(IXFileHandle &ixfileHandle);
     };
 
 }// namespace PeterDB
