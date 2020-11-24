@@ -99,11 +99,11 @@ namespace PeterDB {
         int startEntryIndex = -1;
         PageNum curPageNum = -1;
         int curEntryIndex = -1;
-        FileHandle fileHandle;
+        //FileHandle fileHandle;
         IXFileHandle *ixFileHandle;
 
         // Interface
-        RC setValues(const void *lowKey, const void *highKey, bool lowKeyInclusive, bool highKeyInclusive, FileHandle fileHandle);
+        RC setValues(const void *lowKey, const void *highKey, bool lowKeyInclusive, bool highKeyInclusive, IXFileHandle *ixFileHandle);
 
         // Constructor
         IX_ScanIterator();

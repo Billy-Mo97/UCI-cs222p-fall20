@@ -612,7 +612,7 @@ namespace PeterDB {
     IX_ScanIterator::~IX_ScanIterator() = default;
 
     RC IX_ScanIterator::setValues(const void *lowKey, const void *highKey, bool lowKeyInclusive,
-                                  bool highKeyInclusive, FileHandle fileHandle) {
+                                  bool highKeyInclusive, IXFileHandle *ixFileHandle) {
         if (lowKey != nullptr) {
             if (this->type == TypeInt) {
                 this->lowKey = malloc(sizeof(int));
@@ -645,7 +645,7 @@ namespace PeterDB {
             this->highKey = nullptr;
         }
 
-        this->fileHandle = fileHandle;
+        this->ixFileHandle = ixFileHandle;
         this->lowKeyInclusive = lowKeyInclusive;
         this->highKeyInclusive = highKeyInclusive;
 
@@ -699,12 +699,12 @@ namespace PeterDB {
         if (getRootAndMinLeaf(ixFileHandle) == -1) { return -1; }
         //if (getMinLeaf(ixFileHandle) == -1) { return -1; }
         ix_ScanIterator.type = attribute.type;
-        if (ix_ScanIterator.setValues(lowKey, highKey, lowKeyInclusive, highKeyInclusive, ixFileHandle.fileHandle) ==
+        if (ix_ScanIterator.setValues(lowKey, highKey, lowKeyInclusive, highKeyInclusive, &ixFileHandle) ==
             -1) { return -1; }
         RID rid;
 
         if (lowKey == nullptr) {
-            ixFileHandle.ixReadPageCounter++;
+            //ixFileHandle.ixReadPageCounter++;
             ix_ScanIterator.startPageNum = ixFileHandle.minLeaf;
             ix_ScanIterator.startEntryIndex = 0;
             ix_ScanIterator.curPageNum = ix_ScanIterator.startPageNum;
@@ -825,7 +825,7 @@ namespace PeterDB {
         if (curPageNum == -1) { return IX_EOF; }
 
         // Read current page that is being scanned.
-        if (fileHandle.readPage(curPageNum, pageData) == -1) { return -1; }
+        if (ixFileHandle->readPage(curPageNum, pageData) == -1) { return -1; }
 
         short entryCountTest;
         memcpy(&entryCountTest, pageData + PAGE_SIZE - sizeof(short), sizeof(short));
@@ -880,6 +880,7 @@ namespace PeterDB {
         startEntryIndex = -1;
         curPageNum = -1;
         curEntryIndex = -1;
+        ixFileHandle = nullptr;
         return 0;
     }
 
