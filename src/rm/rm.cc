@@ -1,6 +1,7 @@
 #include "src/include/rm.h"
 #include <map>
 #include <iostream>
+#include <src/include/ix.h>
 #include "math.h"
 namespace PeterDB {
     RelationManager &RelationManager::instance() {
@@ -105,22 +106,26 @@ namespace PeterDB {
         tableFlagAttr.name = "table-flag";
         tableFlagAttr.type = TypeInt;
         tableFlagAttr.length = sizeof(int);
+        Attribute hasIndexAttr;
+        hasIndexAttr.name = "hasIndex";
+        hasIndexAttr.type = TypeInt;
+        hasIndexAttr.length = sizeof(int);
         columnAttributeDescriptor = {tableIdAttr, columnNameAttr, columnTypeAttr,
-                                     columnLengthAttr, columnPositionAttr, tableFlagAttr};
+                                     columnLengthAttr, columnPositionAttr, tableFlagAttr,hasIndexAttr};
         int nullFieldsIndicatorSize = ceil(columnAttributeDescriptor.size() / 8.0);
-        columnDataSize = nullFieldsIndicatorSize + sizeof(int) * 6 + columnName.size();
+        columnDataSize = nullFieldsIndicatorSize + sizeof(int) * 7 + columnName.size();
         return;
     }
 
     void RelationManager::prepareColumnData(int tableId, std::string columnName, AttrType columnType, int columnLength,
                                             int columnPosition,
-                                            int tableFlag, std::vector<Attribute> &columnAttributeDescriptor,
+                                            int tableFlag,int hasIndex, std::vector<Attribute> &columnAttributeDescriptor,
                                             void *columnData) {
         //Prepare the data to insert into "Columns" table.
         int nullFieldsIndicatorSize = ceil(columnAttributeDescriptor.size() / 8.0);
         unsigned char nullsIndicator[nullFieldsIndicatorSize];
         memset(nullsIndicator, 0, nullFieldsIndicatorSize);
-        nullsIndicator[0] = 3; // 00000011
+        nullsIndicator[0] = 1; // 00000001
         memcpy(columnData, nullsIndicator, nullFieldsIndicatorSize);
         int dataOffset = nullFieldsIndicatorSize;
         memcpy((char *) columnData + dataOffset, &tableId, sizeof(int));
@@ -140,6 +145,8 @@ namespace PeterDB {
         memcpy((char *) columnData + dataOffset, &columnPosition, sizeof(int));
         dataOffset += sizeof(int);
         memcpy((char *) columnData + dataOffset, &tableFlag, sizeof(int));
+        dataOffset += sizeof(int);
+        memcpy((char *) columnData + dataOffset, &hasIndex, sizeof(int));
         dataOffset += sizeof(int);
         return;
     }
@@ -223,13 +230,13 @@ namespace PeterDB {
         table_ColumnData3 = malloc(table_ColumnDataSize3); memset(table_ColumnData3, 0, table_ColumnDataSize3);
         table_ColumnData4 = malloc(table_ColumnDataSize4); memset(table_ColumnData4, 0, table_ColumnDataSize4);
         prepareColumnData(1, "table-id", TypeInt, 4,
-                          1, System, table_ColumnAttributeDescriptor1, table_ColumnData1);
+                          1, System,0, table_ColumnAttributeDescriptor1, table_ColumnData1);
         prepareColumnData(1, "table-name", TypeVarChar, 50,
-                          2, System, table_ColumnAttributeDescriptor2, table_ColumnData2);
+                          2, System,0, table_ColumnAttributeDescriptor2, table_ColumnData2);
         prepareColumnData(1, "file-name", TypeVarChar, 50,
-                          3, System, table_ColumnAttributeDescriptor3, table_ColumnData3);
+                          3, System,0, table_ColumnAttributeDescriptor3, table_ColumnData3);
         prepareColumnData(1, "table-flag", TypeInt, 4,
-                          4, System, table_ColumnAttributeDescriptor4, table_ColumnData4);
+                          4, System,0, table_ColumnAttributeDescriptor4, table_ColumnData4);
         //std::cout << "Preparing 4 tuples of \"Tables\" complete\n";
         if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor1, table_ColumnData1, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor2, table_ColumnData2, rid) == -1) { return -1; }
@@ -242,44 +249,49 @@ namespace PeterDB {
         table_ColumnData2 = NULL;
         table_ColumnData3 = NULL;
 
-        //Prepare 6 tuples of "Columns", insert it into "Columns" table.
+        //Prepare 7 tuples of "Columns", insert it into "Columns" table.
         int column_ColumnDataSize1, column_ColumnDataSize2, column_ColumnDataSize3, column_ColumnDataSize4,
-                column_ColumnDataSize5, column_ColumnDataSize6;
+                column_ColumnDataSize5, column_ColumnDataSize6,column_ColumnDataSize7;
         void *column_ColumnData1 = NULL, *column_ColumnData2 = NULL, *column_ColumnData3 = NULL,
-                *column_ColumnData4 = NULL, *column_ColumnData5 = NULL, *column_ColumnData6 = NULL;
+                *column_ColumnData4 = NULL, *column_ColumnData5 = NULL, *column_ColumnData6 = NULL,*column_ColumnData7 = NULL;
         std::vector<Attribute> column_ColumnAttributeDescriptor1, column_ColumnAttributeDescriptor2, column_ColumnAttributeDescriptor3,
-                column_ColumnAttributeDescriptor4, column_ColumnAttributeDescriptor5, column_ColumnAttributeDescriptor6;
+                column_ColumnAttributeDescriptor4, column_ColumnAttributeDescriptor5, column_ColumnAttributeDescriptor6,column_ColumnAttributeDescriptor7;
         prepareColumnAttribute(column_ColumnAttributeDescriptor1, "table-id" ,column_ColumnDataSize1);
         prepareColumnAttribute(column_ColumnAttributeDescriptor2, "column-name" ,column_ColumnDataSize2);
         prepareColumnAttribute(column_ColumnAttributeDescriptor3, "column-type" ,column_ColumnDataSize3);
         prepareColumnAttribute(column_ColumnAttributeDescriptor4, "column-length" ,column_ColumnDataSize4);
         prepareColumnAttribute(column_ColumnAttributeDescriptor5, "column-position" ,column_ColumnDataSize5);
         prepareColumnAttribute(column_ColumnAttributeDescriptor6, "table-flag" ,column_ColumnDataSize6);
+        prepareColumnAttribute(column_ColumnAttributeDescriptor7, "hasIndex" ,column_ColumnDataSize7);
         column_ColumnData1 = malloc(column_ColumnDataSize1); memset(column_ColumnData1, 0, column_ColumnDataSize1);
         column_ColumnData2 = malloc(column_ColumnDataSize2); memset(column_ColumnData2, 0, column_ColumnDataSize2);
         column_ColumnData3 = malloc(column_ColumnDataSize3); memset(column_ColumnData3, 0, column_ColumnDataSize3);
         column_ColumnData4 = malloc(column_ColumnDataSize4); memset(column_ColumnData4, 0, column_ColumnDataSize4);
         column_ColumnData5 = malloc(column_ColumnDataSize5); memset(column_ColumnData5, 0, column_ColumnDataSize5);
         column_ColumnData6 = malloc(column_ColumnDataSize6); memset(column_ColumnData6, 0, column_ColumnDataSize6);
+        column_ColumnData7 = malloc(column_ColumnDataSize7); memset(column_ColumnData7, 0, column_ColumnDataSize7);
         prepareColumnData(2, "table-id", TypeInt, 4,
-                          1, System, column_ColumnAttributeDescriptor1, column_ColumnData1);
+                          1, System,0, column_ColumnAttributeDescriptor1, column_ColumnData1);
         prepareColumnData(2, "column-name", TypeVarChar, 50,
-                          2, System, column_ColumnAttributeDescriptor2, column_ColumnData2);
+                          2, System,0, column_ColumnAttributeDescriptor2, column_ColumnData2);
         prepareColumnData(2, "column-type", TypeInt, 4,
-                          3, System, column_ColumnAttributeDescriptor3, column_ColumnData3);
+                          3, System,0, column_ColumnAttributeDescriptor3, column_ColumnData3);
         prepareColumnData(2, "column-length", TypeInt, 4,
-                          4, System, column_ColumnAttributeDescriptor4, column_ColumnData4);
+                          4, System,0, column_ColumnAttributeDescriptor4, column_ColumnData4);
         prepareColumnData(2, "column-position", TypeInt, 4,
-                          5, System, column_ColumnAttributeDescriptor5, column_ColumnData5);
+                          5, System,0, column_ColumnAttributeDescriptor5, column_ColumnData5);
         prepareColumnData(2, "table-flag", TypeInt, 4,
-                          6, System, column_ColumnAttributeDescriptor6, column_ColumnData6);
-        //std::cout << "Preparing 6 tuples of \"Columns\" complete\n";
+                          6, System,0, column_ColumnAttributeDescriptor6, column_ColumnData6);
+        prepareColumnData(2, "hasIndex", TypeInt, 4,
+                          7, System,0, column_ColumnAttributeDescriptor6, column_ColumnData7);
+        //std::cout << "Preparing 7 tuples of \"Columns\" complete\n";
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor1, column_ColumnData1, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor2, column_ColumnData2, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor3, column_ColumnData3, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor4, column_ColumnData4, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor5, column_ColumnData5, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor6, column_ColumnData6, rid) == -1) { return -1; }
+        if (rbfm.insertRecord(fileHandle, column_ColumnAttributeDescriptor7, column_ColumnData7, rid) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, table_ColumnAttributeDescriptor4, table_ColumnData4, rid) == -1) { return -1; }
         //std::cout << "Insert 6 tuples of \"Columns\" succeed.\n";
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
@@ -289,6 +301,7 @@ namespace PeterDB {
         free(column_ColumnData4);
         free(column_ColumnData5);
         free(column_ColumnData6);
+        free(column_ColumnData7);
         free(table_ColumnData4);
         column_ColumnData1 = NULL;
         column_ColumnData2 = NULL;
@@ -296,6 +309,7 @@ namespace PeterDB {
         column_ColumnData4 = NULL;
         column_ColumnData5 = NULL;
         column_ColumnData6 = NULL;
+        column_ColumnData7 = NULL;
         table_ColumnData4 = NULL;
         return 0;
     }
@@ -309,6 +323,29 @@ namespace PeterDB {
         RC r2 = rbfm.destroyFile("Columns") == -1;
         if (r1 == -1 || r2 == -1) { return -1; }
         return 0;
+    }
+
+    int RelationManager::getMaxTableID(){
+        RM_ScanIterator rmsi;
+        std::vector<std::string> tableIdAttr = {"table-id"};
+        if (scan("Tables", "table-id",
+                 NO_OP, NULL, tableIdAttr, rmsi) == -1) { return -1; }
+        int nullIndicatorSize = ceil(tableIdAttr.size() / 8.0);
+        void *returnedData = malloc(nullIndicatorSize + sizeof(int));
+        memset(returnedData, 0, nullIndicatorSize + sizeof(int));
+        RID rid;
+        int maxId = 0;
+        while (rmsi.getNextTuple(rid, returnedData) != RM_EOF) {
+            int dataOffset = nullIndicatorSize;
+            int currentId;
+            memcpy(&currentId, (char *) returnedData + dataOffset, sizeof(int));
+            //std::cout << "currentId: " << currentId << std::endl;
+            maxId = maxId > currentId ? maxId : currentId;
+        }
+        //std::cout << "maxId: " << maxId << std::endl;
+        rmsi.close();
+        free(returnedData);
+        return maxId;
     }
 
     RC RelationManager::createTable(const std::string &tableName, const std::vector<Attribute> &attrs) {
@@ -370,7 +407,7 @@ namespace PeterDB {
             int columnPosition = i + 1;
             //std::cout << "Creating table: ready for " << i << " th attr to insert into \"Columns\".\n";
             prepareColumnData(tableId, attr.name, attr.type, attr.length, columnPosition,
-                              User, columnAttributeDescriptor, columnData);
+                              User,0, columnAttributeDescriptor, columnData);
             if (rbfm.insertRecord(fileHandle, columnAttributeDescriptor, columnData, rid) == -1) {
                 return -1;
             }
@@ -445,6 +482,15 @@ namespace PeterDB {
         if (rmsi.close() == -1) { return -1; }
         free(returnedData);
         returnedData = NULL;
+        std::vector<Attribute> attributes;
+        getAttributes(tableName, attributes);
+        for(Attribute a:attributes){
+            if(hasIndex(tableName,a.name) == 1){
+                PeterDB::IndexManager& ix = PeterDB::IndexManager::instance();
+                std::string destroyFileName = tableName + a.name + ".idx";
+                if(ix.destroyFile(destroyFileName) == -1) return -1;
+            }
+        }
         //Delete each one in "Columns" table.
         if (rbfm.openFile("Columns", fileHandle) == -1) { return -1; }
         std::vector<Attribute> columnAttributeDescriptor;
@@ -452,8 +498,8 @@ namespace PeterDB {
         //Column attribute descriptor is only used to delete the record, the "column-name" does not
         //represent the real column name.
         prepareColumnAttribute(columnAttributeDescriptor, "column-name", columnDataSize);
-        for (auto delRid : deleteRids) {
-            if (rbfm.deleteRecord(fileHandle, columnAttributeDescriptor, delRid) == -1) {
+        for (auto delRid : deleteRids){
+            if (rbfm.deleteRecord(fileHandle, columnAttributeDescriptor, delRid) == -1){
                 return -1;
             }
         }
@@ -791,4 +837,153 @@ namespace PeterDB {
         return -1;
     }
 
+    int RelationManager::hasIndex(const std::string &tableName, const std::string &attributeName){
+        std::vector<std::string> attribute;
+        attribute.push_back("column-name");
+        attribute.push_back("hasIndex");
+        int nullIndicatorSize = 1;
+        int tableId;
+        std::string fileName;
+        if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
+        RM_ScanIterator rmsi;
+        RID rid;
+        scan("Columns", "table-id", EQ_OP, &tableId, attribute, rmsi);
+        void* returnedData = malloc(PAGE_SIZE);
+        while (rmsi.getNextTuple(rid, returnedData) != RM_EOF){
+            int offset = 0;
+            int nameLen = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+            offset += sizeof(int);
+            char* name = (char *)malloc(nameLen + 1);
+            memcpy(name, (char *)returnedData + nullIndicatorSize + offset, nameLen);
+            name[nameLen] = '\0';
+            offset += nameLen;
+            int hasIndex = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+            offset += sizeof(int);
+            if (name == attributeName){
+                free(name);
+                free(returnedData);
+                rmsi.close();
+                return hasIndex;
+            }
+            free(name);
+        }
+        free(returnedData);
+        rmsi.close();
+        return 0;
+    }
+
+    RC RelationManager::createIndex(const std::string &tableName, const std::string &attributeName){
+        if (checkCatalog() == -1) { return -1; }
+        //std::cout<<"checkCatalog complete\n";
+        int tableId;
+        std::string fileName;
+        if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
+        //std::cout<<"getTableInfo complete\n";
+        //this->map_hasIndex[indexFileName] = true;
+        //change the value of hasIndex in Columns table
+        int keyLength;
+        Attribute keyAttribute;
+        std::vector<std::string> attribute;
+        attribute.push_back("column-name");
+        attribute.push_back("column-type");
+        attribute.push_back("column-length");
+        attribute.push_back("column-position");
+        attribute.push_back("table-flag");
+        attribute.push_back("hasIndex");
+        int nullIndicatorSize = 1;
+        void *data = malloc(sizeof(int));
+        memcpy((char *)data, &tableId, sizeof(int));
+        RM_ScanIterator rmsi;
+        RID rid;
+        scan("Columns", "table-id", EQ_OP, data, attribute, rmsi);
+        free(data);
+        void* returnedData = malloc(PAGE_SIZE);
+        while (rmsi.getNextTuple(rid, returnedData) != RM_EOF){
+            Attribute attr;
+            int offset = 0;
+            int nameLen = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+            offset += sizeof(int);
+            char* name = (char *)malloc(nameLen + 1);
+            memcpy(name, (char *)returnedData + nullIndicatorSize + offset, nameLen);
+            name[nameLen] = '\0';
+            offset += nameLen;
+            attr.name = name;
+            if(attr.name == attributeName){
+                int type = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                offset += sizeof(AttrType);
+                attr.type = (AttrType)type;
+                int columnLength = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                attr.length = (AttrLength)columnLength;
+                keyLength = columnLength;
+                keyAttribute = attr;
+                offset += sizeof(int);
+                int pos = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                offset += sizeof(int);
+                std::vector<Attribute> columnAttributeDescriptor;
+                void *columnData = NULL;
+                int columnDataSize;
+                prepareColumnAttribute(columnAttributeDescriptor, attr.name, columnDataSize);
+                columnData = malloc(columnDataSize); memset(columnData, 0, columnDataSize);
+                //std::cout << "Creating table: ready for " << i << " th attr to insert into \"Columns\".\n";
+                prepareColumnData(tableId, attr.name, attr.type, attr.length, pos,
+                                  User,1, columnAttributeDescriptor, columnData);
+                PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
+                PeterDB::FileHandle fileHandle;
+                rbfm.openFile("Columns",fileHandle);
+                if (rbfm.updateRecord(fileHandle, columnAttributeDescriptor, columnData, rid) == -1) {
+                    return -1;
+                }
+                rbfm.closeFile(fileHandle);
+                free(columnData);
+                free(name);
+                break;
+            }
+            free(name);
+        }
+        free(returnedData);
+        rmsi.close();
+        //std::cout<<"scan column complete\n";
+        //Create index file
+        std::string indexFileName = tableName + attributeName + ".idx";
+        PeterDB::IndexManager& ix = PeterDB::IndexManager::instance();
+        PeterDB::IXFileHandle ixFileHandle;
+        if(ix.createFile(indexFileName) == -1) return -1;
+        //insert entries into index file
+        std::vector<std::string> attributeNameVec;
+        attributeNameVec.push_back(attributeName);
+        scan(tableName, "", NO_OP, NULL, attributeNameVec, rmsi);
+        if(ix.openFile(indexFileName, ixFileHandle) == -1) return -1;
+        void *key = malloc(keyLength); //The key contains the nullIndicator
+        while(rmsi.getNextTuple(rid, key) != RM_EOF){
+            if(ix.insertEntry(ixFileHandle, keyAttribute, (char*)key+1, rid) == -1) return -1;
+        }
+        //std::cout<<"scan target file complete\n";
+        rmsi.close();
+        return 0;
+    }
+
+    RC RelationManager::destroyIndex(const std::string &tableName, const std::string &attributeName){}
+
+    RC RelationManager::indexScan(const std::string &tableName,
+                 const std::string &attributeName,
+                 const void *lowKey,
+                 const void *highKey,
+                 bool lowKeyInclusive,
+                 bool highKeyInclusive,
+                 RM_IndexScanIterator &rm_IndexScanIterator){}
+    RM_IndexScanIterator::RM_IndexScanIterator(){
+
+    }
+
+    RM_IndexScanIterator::~RM_IndexScanIterator(){
+
+    }
+
+    RC RM_IndexScanIterator::getNextEntry(RID &rid, void *key){
+        return -1;
+    }
+
+    RC RM_IndexScanIterator::close(){
+        return -1;
+    }
 } // namespace PeterDB

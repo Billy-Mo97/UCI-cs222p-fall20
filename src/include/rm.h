@@ -42,8 +42,9 @@ namespace PeterDB {
         void prepareColumnAttribute(std::vector<Attribute> &columnAttributeDescriptor, std::string columnName, int &columnDataSize);
 
         void prepareColumnData(int tableId, std::string columnName, AttrType columnType, int columnLength,
-                               int columnPosition, int tableFlag, std::vector<Attribute> &columnAttributeDescriptor, void *columnData);
+                               int columnPosition, int tableFlag,int hasIndex, std::vector<Attribute> &columnAttributeDescriptor, void *columnData);
 
+        int getMaxTableID();
         RC checkCatalog();
 
         RC createCatalog();
