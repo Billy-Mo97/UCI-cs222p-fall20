@@ -696,6 +696,7 @@ namespace PeterDB {
         if (rbfm.openFile(fileName, fileHandle) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, recordDescriptor, data, rid) == -1) { return -1; }
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
+        //insert indexes
         int offset = ceil((double)recordDescriptor.size() / CHAR_BIT);
         for(Attribute a:recordDescriptor){
             if(hasIndex(tableName,a.name) == 1){
@@ -1095,6 +1096,8 @@ namespace PeterDB {
         std::string fileName;
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
         getAttributeFromIndex(tableId,attributeName,keyAttribute);
+        std::string indexFile = tableName + attributeName + ".idx";
+        IndexManager::instance().openFile(indexFile, rm_IndexScanIterator.ixFileHandle);
         if(IndexManager::instance().scan(rm_IndexScanIterator.ixFileHandle,keyAttribute,lowKey,highKey,
                                          lowKeyInclusive,highKeyInclusive,rm_IndexScanIterator.ixScanIterator)==-1)
             return -1;

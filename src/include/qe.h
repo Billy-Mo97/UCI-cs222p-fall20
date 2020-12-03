@@ -219,9 +219,19 @@ namespace PeterDB {
         ~INLJoin() override;
 
         RC getNextTuple(void *data) override;
-
+        RC joinLeftAndRight(void*data);
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
+        Iterator* leftIn;
+        IndexScan* rightIn;
+        Condition condition;
+        int leftIndex;
+        int rightIndex;
+        std::vector<Attribute> leftAttrs;
+        std::vector<Attribute> rightAttrs;
+        char* leftBuffer;
+        char* rightBuffer;
+        bool end;
     };
 
     // 10 extra-credit points
