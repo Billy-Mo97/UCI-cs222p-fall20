@@ -607,9 +607,9 @@ namespace PeterDB {
         return DFS(ixFileHandle, ixFileHandle.bTree->root, attribute, out);
     }
 
-    IX_ScanIterator::IX_ScanIterator() = default;
+    IX_ScanIterator::IX_ScanIterator(){}
 
-    IX_ScanIterator::~IX_ScanIterator() = default;
+    IX_ScanIterator::~IX_ScanIterator(){}
 
     RC IX_ScanIterator::setValues(const void *lowKey, const void *highKey, bool lowKeyInclusive,
                                   bool highKeyInclusive, IXFileHandle *ixFileHandle) {
