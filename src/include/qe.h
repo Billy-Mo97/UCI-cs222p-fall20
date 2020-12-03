@@ -157,11 +157,19 @@ namespace PeterDB {
     class Filter : public Iterator {
         // Filter operator
     public:
+        Iterator *input;
+        Condition condition;
         Filter(Iterator *input,               // Iterator of input R
                const Condition &condition     // Selection condition
         );
 
         ~Filter() override;
+
+        RC getAttributeName(std::string attr, std::string &attrName);
+
+        RC getAttributeValue(void *data, std::vector<Attribute> attributes, int condIndex, void *value, int &dataLen);
+
+        bool checkCondition(Attribute attr, void *value);
 
         RC getNextTuple(void *data) override;
 
