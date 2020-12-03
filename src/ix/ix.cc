@@ -874,8 +874,12 @@ namespace PeterDB {
     }
 
     RC IX_ScanIterator::close() {
-        free(lowKey);
-        free(highKey);
+        if(lowKey!=NULL && highKey!=NULL&&IndexManager::instance().compareKey(this->type,lowKey,highKey) == 0) free(lowKey);
+        else{
+            free(lowKey);
+            free(highKey);
+        }
+
         startPageNum = -1;
         startEntryIndex = -1;
         curPageNum = -1;
