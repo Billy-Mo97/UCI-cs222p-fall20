@@ -426,7 +426,16 @@ namespace PeterDB {
         //First, open "Tables" table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
-
+        //delete indexes
+        std::vector<Attribute> attributes;
+        getAttributes(tableName, attributes);
+        for(Attribute a:attributes){
+            if(hasIndex(tableName,a.name) == 1){
+                PeterDB::IndexManager& ix = PeterDB::IndexManager::instance();
+                std::string destroyFileName = tableName + a.name + ".idx";
+                if(ix.destroyFile(destroyFileName) == -1) return -1;
+            }
+        }
         //Scan the "Tables" table to search the tableId with tableName
         std::vector<std::string> attributeNames = {"table-id", "file-name"};
         RM_ScanIterator rmsi;
@@ -482,15 +491,6 @@ namespace PeterDB {
         if (rmsi.close() == -1) { return -1; }
         free(returnedData);
         returnedData = NULL;
-        std::vector<Attribute> attributes;
-        getAttributes(tableName, attributes);
-        for(Attribute a:attributes){
-            if(hasIndex(tableName,a.name) == 1){
-                PeterDB::IndexManager& ix = PeterDB::IndexManager::instance();
-                std::string destroyFileName = tableName + a.name + ".idx";
-                if(ix.destroyFile(destroyFileName) == -1) return -1;
-            }
-        }
         //Delete each one in "Columns" table.
         if (rbfm.openFile("Columns", fileHandle) == -1) { return -1; }
         std::vector<Attribute> columnAttributeDescriptor;
@@ -656,13 +656,26 @@ namespace PeterDB {
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
         std::vector<Attribute> recordDescriptor;
         if (getAttributes(tableName, recordDescriptor) == -1) { return -1; }
-
         //Then, insert the data into the table.
         PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
         PeterDB::FileHandle fileHandle;
         if (rbfm.openFile(fileName, fileHandle) == -1) { return -1; }
         if (rbfm.insertRecord(fileHandle, recordDescriptor, data, rid) == -1) { return -1; }
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
+        int offset = ceil((double)recordDescriptor.size() / CHAR_BIT);
+        for(Attribute a:recordDescriptor){
+            if(hasIndex(tableName,a.name) == 1){
+                PeterDB::IndexManager& ix = PeterDB::IndexManager::instance();
+                PeterDB::IXFileHandle ixFileHandle;
+                std::string indexFileName = tableName + a.name + ".idx";
+                if(ix.openFile(indexFileName,ixFileHandle) == -1) return -1;
+                if(ix.insertEntry(ixFileHandle,a,(char*)data + offset,rid) == -1) return -1;
+                if(a.type == TypeInt) offset += sizeof(int);
+                else if(a.type == TypeReal) offset += sizeof(float);
+                else if(a.type == TypeVarChar) offset += sizeof(int) + *(int*)((char*)data + offset);
+                ix.closeFile(ixFileHandle);
+            }
+        }
         return 0;
     }
 
@@ -878,8 +891,6 @@ namespace PeterDB {
         int tableId;
         std::string fileName;
         if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
-        //std::cout<<"getTableInfo complete\n";
-        //this->map_hasIndex[indexFileName] = true;
         //change the value of hasIndex in Columns table
         int keyLength;
         Attribute keyAttribute;
@@ -962,7 +973,78 @@ namespace PeterDB {
         return 0;
     }
 
-    RC RelationManager::destroyIndex(const std::string &tableName, const std::string &attributeName){}
+    RC RelationManager::destroyIndex(const std::string &tableName, const std::string &attributeName){
+        if (checkCatalog() == -1) { return -1; }
+        int tableId;
+        std::string fileName;
+        if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
+        //change the value of hasIndex in Columns table
+        int keyLength;
+        Attribute keyAttribute;
+        std::vector<std::string> attribute;
+        attribute.push_back("column-name");
+        attribute.push_back("column-type");
+        attribute.push_back("column-length");
+        attribute.push_back("column-position");
+        attribute.push_back("table-flag");
+        attribute.push_back("hasIndex");
+        int nullIndicatorSize = 1;
+        void *data = malloc(sizeof(int));
+        memcpy((char *)data, &tableId, sizeof(int));
+        RM_ScanIterator rmsi;
+        RID rid;
+        scan("Columns", "table-id", EQ_OP, data, attribute, rmsi);
+        free(data);
+        void* returnedData = malloc(PAGE_SIZE);
+        while (rmsi.getNextTuple(rid, returnedData) != RM_EOF){
+            Attribute attr;
+            int offset = 0;
+            int nameLen = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+            offset += sizeof(int);
+            char* name = (char *)malloc(nameLen + 1);
+            memcpy(name, (char *)returnedData + nullIndicatorSize + offset, nameLen);
+            name[nameLen] = '\0';
+            offset += nameLen;
+            attr.name = name;
+            if(attr.name == attributeName){
+                int type = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                offset += sizeof(AttrType);
+                attr.type = (AttrType)type;
+                int columnLength = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                attr.length = (AttrLength)columnLength;
+                keyLength = columnLength;
+                keyAttribute = attr;
+                offset += sizeof(int);
+                int pos = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                offset += sizeof(int);
+                std::vector<Attribute> columnAttributeDescriptor;
+                void *columnData = NULL;
+                int columnDataSize;
+                prepareColumnAttribute(columnAttributeDescriptor, attr.name, columnDataSize);
+                columnData = malloc(columnDataSize); memset(columnData, 0, columnDataSize);
+                //std::cout << "Creating table: ready for " << i << " th attr to insert into \"Columns\".\n";
+                prepareColumnData(tableId, attr.name, attr.type, attr.length, pos,
+                                  User,0, columnAttributeDescriptor, columnData);
+                PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
+                PeterDB::FileHandle fileHandle;
+                rbfm.openFile("Columns",fileHandle);
+                if (rbfm.updateRecord(fileHandle, columnAttributeDescriptor, columnData, rid) == -1) {
+                    return -1;
+                }
+                rbfm.closeFile(fileHandle);
+                free(columnData);
+                free(name);
+                break;
+            }
+            free(name);
+        }
+        free(returnedData);
+        rmsi.close();
+        //destroy index file
+        std::string indexFileName = tableName + attributeName + ".idx";
+        if(PeterDB::IndexManager::instance().destroyFile(indexFileName) == -1) return -1;
+        return 0;
+    }
 
     RC RelationManager::indexScan(const std::string &tableName,
                  const std::string &attributeName,
@@ -970,9 +1052,63 @@ namespace PeterDB {
                  const void *highKey,
                  bool lowKeyInclusive,
                  bool highKeyInclusive,
-                 RM_IndexScanIterator &rm_IndexScanIterator){}
-    RM_IndexScanIterator::RM_IndexScanIterator(){
+                 RM_IndexScanIterator &rm_IndexScanIterator){
+        Attribute keyAttribute;
+        int tableId;
+        std::string fileName;
+        if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
+        getAttributeFromIndex(tableId,attributeName,keyAttribute);
+        if(IndexManager::instance().scan(rm_IndexScanIterator.ixFileHandle,keyAttribute,lowKey,highKey,
+                                         lowKeyInclusive,highKeyInclusive,rm_IndexScanIterator.ixScanIterator)==-1)
+            return -1;
+        return 0;
+    }
 
+    RC RelationManager::getAttributeFromIndex(int tableId, const std::string &attributeName, Attribute&targetAttribute) {
+        int keyLength;
+        std::vector<std::string> attribute;
+        attribute.push_back("column-name");
+        attribute.push_back("column-type");
+        attribute.push_back("column-length");
+        int nullIndicatorSize = 1;
+        void *data = malloc(sizeof(int));
+        memcpy((char *)data, &tableId, sizeof(int));
+        RM_ScanIterator rmsi;
+        RID rid;
+        scan("Columns", "table-id", EQ_OP, data, attribute, rmsi);
+        free(data);
+        void* returnedData = malloc(PAGE_SIZE);
+        while (rmsi.getNextTuple(rid, returnedData) != RM_EOF){
+            Attribute attr;
+            int offset = 0;
+            int nameLen = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+            offset += sizeof(int);
+            char* name = (char *)malloc(nameLen + 1);
+            memcpy(name, (char *)returnedData + nullIndicatorSize + offset, nameLen);
+            name[nameLen] = '\0';
+            offset += nameLen;
+            attr.name = name;
+            if(attr.name == attributeName){
+                int type = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                offset += sizeof(AttrType);
+                attr.type = (AttrType)type;
+                int columnLength = *(int *)((char *)returnedData + offset + nullIndicatorSize);
+                attr.length = (AttrLength)columnLength;
+                keyLength = columnLength;
+                targetAttribute = attr;
+                free(name);
+                break;
+            }
+            free(name);
+        }
+        free(returnedData);
+        rmsi.close();
+        return 0;
+    }
+
+    RM_IndexScanIterator::RM_IndexScanIterator(){
+        ixScanIterator = IX_ScanIterator();
+        ixFileHandle = IXFileHandle();
     }
 
     RM_IndexScanIterator::~RM_IndexScanIterator(){
@@ -980,10 +1116,10 @@ namespace PeterDB {
     }
 
     RC RM_IndexScanIterator::getNextEntry(RID &rid, void *key){
-        return -1;
+        return ixScanIterator.getNextEntry(rid,key);
     }
 
     RC RM_IndexScanIterator::close(){
-        return -1;
+        return ixScanIterator.close();
     }
 } // namespace PeterDB
