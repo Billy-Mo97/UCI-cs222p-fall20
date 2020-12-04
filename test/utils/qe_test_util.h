@@ -325,6 +325,12 @@ namespace PeterDBTesting {
                 else if (tableName == "group")
                     prepareGroupTable(nullsIndicator, i, inBuffer);
 
+                std::cout << "Inserting " << i << " th tuple.\n";
+                if (i >= 848) {
+                    ASSERT_EQ(rm.insertTuple(tableName, inBuffer, rid), success)
+                                                << "relationManager.insertTuple() should succeed.";
+                    continue;
+                }
                 ASSERT_EQ(rm.insertTuple(tableName, inBuffer, rid), success)
                                             << "relationManager.insertTuple() should succeed.";
             }
