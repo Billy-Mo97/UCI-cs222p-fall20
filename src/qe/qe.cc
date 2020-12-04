@@ -316,10 +316,6 @@ namespace PeterDB {
                 for (int i = innerIndex; i < inner.size(); i++) {
                     char *innerAttrVal = (char *) calloc(PAGE_SIZE, 1);
                     getAttrVal(innerAttrVal, inner[i].data, innerAttrIndex, rightAttrs);
-                    char *cval = (char *) calloc(PAGE_SIZE, 1);
-                    getAttrVal(cval, inner[i].data, 1, rightAttrs);
-                    char *dval = (char *) calloc(PAGE_SIZE, 1);
-                    getAttrVal(dval, inner[i].data, 2, rightAttrs);
                     if (compareKey(type, outAttrVal, innerAttrVal) == 0) {
                         joinLeftAndRight(data, out[outIndex].data, out[outIndex].length, inner[i].data,
                                          inner[i].length);
@@ -329,8 +325,6 @@ namespace PeterDB {
                         return 0;
                     }
                     free(innerAttrVal);
-                    free(cval);
-                    free(dval);
                 }
                 free(outAttrVal);
                 outIndex++;
@@ -528,7 +522,13 @@ namespace PeterDB {
     }
 
     Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, AggregateOp op) {
-
+        this->input = input;
+        this->aggAttr = aggAttr;
+        this->op = op;
+        this->input->getAttributes(this->attrs);
+        this->attrIndex = getAttrIndex(this->attrs, aggAttr.name);
+        this->end = false;
+        this->groupby = false;
     }
 
     Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, const Attribute &groupAttr, AggregateOp op) {
@@ -540,10 +540,53 @@ namespace PeterDB {
     }
 
     RC Aggregate::getNextTuple(void *data) {
-        return -1;
+        if (this->end) return QE_EOF;
+        ((char *) data)[0] = 0;
+        if (!this->groupby) {
+            char *temp = (char *) malloc(PAGE_SIZE);
+            float sum = 0, min = std::numeric_limits<float>::max(), max = std::numeric_limits<float>::min();
+            int count = 0;
+            while (this->input->getNextTuple(temp) != QE_EOF) {
+                Value val = getAttrValue(temp, this->attrIndex, this->attrs);
+                if (val.type == AttrType::TypeInt) {
+                    sum += (float) *(int *) val.data;
+                    min = (float) *(int *) val.data < min ? (float) *(int *) val.data : min;
+                    max = (float) *(int *) val.data > max ? (float) *(int *) val.data : max;
+                } else if (val.type == AttrType::TypeReal) {
+                    sum += *(float *) val.data;
+                    min = *(float *) val.data < min ? *(float *) val.data : min;
+                    max = *(float *) val.data > max ? *(float *) val.data : max;
+                }
+                count++;
+            }
+            if (op == AVG) {
+                if (count == 0) return QE_EOF;
+                float result = sum / count;
+                memcpy((char *) data + 1, &result, sizeof(float));
+            } else if (op == SUM) {
+                if (count == 0) return QE_EOF;
+                memcpy((char *) data + 1, &sum, sizeof(float));
+            } else if (op == MAX) {
+                if (count == 0) return QE_EOF;
+                memcpy((char *) data + 1, &max, sizeof(float));
+            } else if (op == MIN) {
+                if (count == 0) return QE_EOF;
+                memcpy((char *) data + 1, &min, sizeof(float));
+            } else if (op == COUNT) {
+                memcpy((char *) data + 1, &count, sizeof(float));
+            }
+            free(temp);
+            end = true;
+        }
+        return 0;
     }
 
     RC Aggregate::getAttributes(std::vector<Attribute> &attrs) const {
-        return -1;
+        attrs.clear();
+        Attribute attr = this->aggAttr;
+        std::string dic[] = {"MIN", "MAX", "COUNT", "SUM", "AVG"};
+        attr.name = dic[op] + "(" + aggAttr.name + ")";
+        attrs.push_back(attr);
+        return 0;
     }
 } // namespace PeterDB

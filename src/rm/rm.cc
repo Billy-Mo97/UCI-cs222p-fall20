@@ -1006,7 +1006,6 @@ namespace PeterDB {
         while (rmsi.getNextTuple(rid, key) != RM_EOF) {
             if (ix.insertEntry(ixFileHandle, keyAttribute, (char *) key + 1, rid) == -1) return -1;
         }
-        //std::cout<<"scan target file complete\n";
         rmsi.close();
         return 0;
     }

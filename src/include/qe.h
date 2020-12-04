@@ -310,7 +310,15 @@ namespace PeterDB {
         );
 
         ~Aggregate() override;
-
+        Iterator *input;                              // Iterator of input R
+        Attribute aggAttr;                            // The attribute over which we are computing an aggregate
+        AggregateOp op;                               // Aggregate operation
+        std::vector<Attribute> attrs;
+        int attrIndex;
+        bool end;
+        //map<Value, AggregateResult> groupResult;
+        //map<Value, AggregateResult>::iterator groupResultIter;
+        bool groupby;
         RC getNextTuple(void *data) override;
 
         // Please name the output attribute as aggregateOp(aggAttr)
