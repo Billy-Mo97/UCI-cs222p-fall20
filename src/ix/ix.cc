@@ -294,6 +294,7 @@ namespace PeterDB {
             rootPointer->pageNum = rootPageNum;
             if (ixFileHandle.bTree->loadNode(ixFileHandle, rootPointer) == -1) { return -1; }
             ixFileHandle.bTree->root = rootPointer;
+            char rootType = rootPointer->type;
 
             Node *minLeafPointer = new Node();
             minLeafPointer->pageNum = minLeafPageNum;
@@ -1057,7 +1058,11 @@ namespace PeterDB {
         //This is a helper function to get some shared information from index file for both internal node and leaf node:
         //type, size and slotCount.
         //Then set isLoaded to true,
-        res->type = attrType;
+        char type;
+        memcpy(&type, data + offset, sizeof(char));
+        res->type = type;
+        offset += sizeof(char);
+        //res->type = attrType;
         short size;
         memcpy(&size, data + offset, sizeof(short));
         offset += sizeof(short);
@@ -1199,11 +1204,17 @@ namespace PeterDB {
         //Node class can either be internalNode or leafNode.
         //data pointer is pre-loaded with the data of Node in index file.
         res = new Node();
-        short offset, slotCount;
+        short offset = 0, slotCount;
         if (generateNodeHeader(res, data, offset, slotCount) == -1) { return -1; }
         if (res->type == INTERNAL) {
             if (generateInternalNode(res, data, offset, slotCount) == -1) { return -1; }
         } else if (res->type == LEAF) {
+            LeafNode *temp = new LeafNode();
+            temp->type = res->type;
+            temp->sizeInPage = res->sizeInPage;
+            temp->isLoaded = res->isLoaded;
+            delete res;
+            res = temp;
             if (generateLeafNode(res, data, offset, slotCount) == -1) { return -1; }
         }
         return 0;

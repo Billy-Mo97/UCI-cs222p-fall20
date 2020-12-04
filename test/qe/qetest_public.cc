@@ -22,19 +22,22 @@ namespace PeterDBTesting {
         ASSERT_EQ(glob(".idx").size(), 1) << "There should be one index files now.";
 
         // Insert tuples.
-        populateTable(tableName, 100);
+        populateTable(tableName, 1000);
         PeterDB::Attribute attr;attr.name="B";attr.type=PeterDB::TypeInt;attr.length=4;
         PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
         PeterDB::IX_ScanIterator ix_ScanIterator;
         PeterDB::IXFileHandle ixFileHandle;
         ix.openFile("leftB.idx",ixFileHandle);
+        int mapSize = ixFileHandle.bTree->nodeMap.size();
         ix.printBTree(ixFileHandle, attr, std::cout);
         // Create an index after inserting tuples - should reflect the currently existing tuples.
-        ASSERT_EQ(rm.createIndex(tableName, "C"), success) << "RelationManager.createIndex() should succeed.";
+        ix.closeFile(ixFileHandle);
+        /*ASSERT_EQ(rm.createIndex(tableName, "C"), success) << "RelationManager.createIndex() should succeed.";
         ASSERT_EQ(glob(".idx").size(), 2) << "There should be two index files now.";
         attr.name="C";attr.type=PeterDB::TypeReal;attr.length=4;
         ix.openFile("leftC.idx",ixFileHandle);
         ix.printBTree(ixFileHandle, attr, std::cout);
+        ix.closeFile(ixFileHandle);*/
         destroyFile = false; // prevent from double deletion
 
         // Destroy the file
@@ -47,7 +50,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(QE_Test, table_scan_with_int_filter) {
+    /*TEST_F(QE_Test, table_scan_with_int_filter) {
 
         // Filter -- TableScan as input, on an Integer Attribute
         // SELECT * FROM LEFT WHERE B <= 51
@@ -807,6 +810,6 @@ namespace PeterDBTesting {
             checkPrintRecord(expected[i], printed[i], false, {}, true);
         }
 
-    }
+    }*/
 
 } // namespace PeterDBTesting

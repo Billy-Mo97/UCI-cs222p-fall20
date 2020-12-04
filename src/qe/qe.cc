@@ -68,15 +68,57 @@ namespace PeterDB {
     bool Filter::checkCondition(Attribute attr, void *value) {
         AttrType type = attr.type;
         if (type == TypeInt) {
-            if (memcmp(value, condition.rhsValue.data, sizeof(int)) == 0) { return true; }
+            int readVal;
+            memcpy(&readVal, value, sizeof(int));
+            int conditionVal;
+            memcpy(&conditionVal, condition.rhsValue.data, sizeof(int));
+            if (readVal - conditionVal > 0 &&
+                (condition.op == LE_OP || condition.op == LT_OP || condition.op == EQ_OP))
+                return false;
+            if (readVal - conditionVal == 0 &&
+                (condition.op  == LT_OP || condition.op == GT_OP))
+                return false;
+            if (readVal - conditionVal < 0 &&
+                (condition.op  == GE_OP || condition.op == GT_OP || condition.op == EQ_OP))
+                return false;
         } else if (type == TypeReal) {
-            if (memcmp(value, condition.rhsValue.data, sizeof(float)) == 0) { return true; }
+            float readVal;
+            memcpy(&readVal, value, sizeof(float));
+            float conditionVal;
+            memcpy(&conditionVal, condition.rhsValue.data, sizeof(float));
+            if (readVal - conditionVal > 0 &&
+                (condition.op == LE_OP || condition.op == LT_OP || condition.op == EQ_OP))
+                return false;
+            if (readVal - conditionVal == 0 &&
+                (condition.op  == LT_OP || condition.op == GT_OP))
+                return false;
+            if (readVal - conditionVal < 0 &&
+                (condition.op  == GE_OP || condition.op == GT_OP || condition.op == EQ_OP))
+                return false;
         } else if (type == TypeVarChar) {
-            int strLen;
-            memcpy(&strLen, (char *) value, sizeof(int));
-            if (memcmp(value, condition.rhsValue.data, sizeof(int) + strLen) == 0) { return true; }
+            int readStrLen;
+            memcpy(&readStrLen, value, sizeof(int));
+            char readVal[readStrLen + 1];
+            memset(readVal, 0, readStrLen + 1);
+            readVal[readStrLen] = '\0';
+            memcpy(readVal, (char *) value + sizeof(int), readStrLen);
+            int conditionStrLen;
+            memcpy(&conditionStrLen, (char *) condition.rhsValue.data, sizeof(int));
+            char conditionVal[conditionStrLen + 1];
+            memset(conditionVal, 0, conditionStrLen + 1);
+            conditionVal[conditionStrLen] = '\0';
+            memcpy(conditionVal, (char *) condition.rhsValue.data + sizeof(int), conditionStrLen);
+            if (strcmp(readVal, conditionVal) > 0 &&
+                (condition.op == LE_OP || condition.op == LT_OP || condition.op == EQ_OP))
+                return false;
+            if (strcmp(readVal, conditionVal) == 0 &&
+                (condition.op == LT_OP || condition.op == GT_OP))
+                return false;
+            if (strcmp(readVal, conditionVal) < 0 &&
+                (condition.op == GE_OP || condition.op == GT_OP || condition.op == EQ_OP))
+                return false;
         }
-        return false;
+        return true;
     }
 
     RC Filter::getNextTuple(void *data) {
@@ -84,13 +126,15 @@ namespace PeterDB {
         if (getAttributes(attributes) == -1) { return -1; }
         int condIndex = -1;
         for (int i = 0; i < attributes.size(); i++) {
-            std::string condName;
-            if (getAttributeName(condition.lhsAttr, condName) == -1) { continue; }
+            std::string condName = condition.lhsAttr;
+            //if (getAttributeName(condition.lhsAttr, condName) == -1) { continue; }
             if (condName == attributes[i].name) {
                 condIndex = i;
                 break;
             }
         }
+
+        if (condIndex == -1) { return QE_EOF; }
         void *returnedData = malloc(PAGE_SIZE);
         memset(returnedData, 0, PAGE_SIZE);
         while (input->getNextTuple(returnedData) != QE_EOF) {
