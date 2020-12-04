@@ -22,22 +22,26 @@ namespace PeterDBTesting {
         ASSERT_EQ(glob(".idx").size(), 1) << "There should be one index files now.";
 
         // Insert tuples.
-        populateTable(tableName, 1000);
-        PeterDB::Attribute attr;attr.name="B";attr.type=PeterDB::TypeInt;attr.length=4;
+        populateTable(tableName, 100);
+        PeterDB::Attribute attr;
+        attr.name = "B";
+        attr.type = PeterDB::TypeInt;
+        attr.length = 4;
         PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
         PeterDB::IX_ScanIterator ix_ScanIterator;
         PeterDB::IXFileHandle ixFileHandle;
-        ix.openFile("leftB.idx",ixFileHandle);
-        int mapSize = ixFileHandle.bTree->nodeMap.size();
-        ix.printBTree(ixFileHandle, attr, std::cout);
+        //ix.openFile("leftB.idx",ixFileHandle);
+        //ix.printBTree(ixFileHandle, attr, std::cout);
+        //ix.closeFile(ixFileHandle);
         // Create an index after inserting tuples - should reflect the currently existing tuples.
-        ix.closeFile(ixFileHandle);
-        /*ASSERT_EQ(rm.createIndex(tableName, "C"), success) << "RelationManager.createIndex() should succeed.";
+        ASSERT_EQ(rm.createIndex(tableName, "C"), success) << "RelationManager.createIndex() should succeed.";
         ASSERT_EQ(glob(".idx").size(), 2) << "There should be two index files now.";
-        attr.name="C";attr.type=PeterDB::TypeReal;attr.length=4;
-        ix.openFile("leftC.idx",ixFileHandle);
-        ix.printBTree(ixFileHandle, attr, std::cout);
-        ix.closeFile(ixFileHandle);*/
+        attr.name = "C";
+        attr.type = PeterDB::TypeReal;
+        attr.length = 4;
+        //ix.openFile("leftC.idx",ixFileHandle);
+        //ix.printBTree(ixFileHandle, attr, std::cout);
+        //ix.closeFile(ixFileHandle);
         destroyFile = false; // prevent from double deletion
 
         // Destroy the file
@@ -50,7 +54,7 @@ namespace PeterDBTesting {
 
     }
 
-    /*TEST_F(QE_Test, table_scan_with_int_filter) {
+    TEST_F(QE_Test, table_scan_with_int_filter) {
 
         // Filter -- TableScan as input, on an Integer Attribute
         // SELECT * FROM LEFT WHERE B <= 51
@@ -325,7 +329,7 @@ namespace PeterDBTesting {
         for (int i = 0; i < expected.size(); ++i) {
             checkPrintRecord(expected[i], printed[i]);
         }
-
+        std::cout << "bnl finshed\n";
     }
 
     TEST_F(QE_Test, bnljoin_with_filter) {
@@ -810,6 +814,6 @@ namespace PeterDBTesting {
             checkPrintRecord(expected[i], printed[i], false, {}, true);
         }
 
-    }*/
+    }
 
 } // namespace PeterDBTesting

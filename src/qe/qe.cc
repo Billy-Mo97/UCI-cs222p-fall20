@@ -24,11 +24,12 @@ namespace PeterDB {
         return 0;
     }
 
-    RC Filter::getAttributeValue(void *data, std::vector<Attribute> attributes, int condIndex, void *value, int &dataLen) {
+    RC
+    Filter::getAttributeValue(void *data, std::vector<Attribute> attributes, int condIndex, void *value, int &dataLen) {
         int dataOffset = 0;
         int nullIndicatorSize = ceil(attributes.size() / 8.0);
         char *nullIndicator = (char *) malloc(nullIndicatorSize);
-        memset(nullIndicator,0, nullIndicatorSize);
+        memset(nullIndicator, 0, nullIndicatorSize);
         memcpy(nullIndicator, (char *) data + dataOffset, nullIndicatorSize);
 
         dataOffset += nullIndicatorSize;
@@ -76,10 +77,10 @@ namespace PeterDB {
                 (condition.op == LE_OP || condition.op == LT_OP || condition.op == EQ_OP))
                 return false;
             if (readVal - conditionVal == 0 &&
-                (condition.op  == LT_OP || condition.op == GT_OP))
+                (condition.op == LT_OP || condition.op == GT_OP))
                 return false;
             if (readVal - conditionVal < 0 &&
-                (condition.op  == GE_OP || condition.op == GT_OP || condition.op == EQ_OP))
+                (condition.op == GE_OP || condition.op == GT_OP || condition.op == EQ_OP))
                 return false;
         } else if (type == TypeReal) {
             float readVal;
@@ -90,10 +91,10 @@ namespace PeterDB {
                 (condition.op == LE_OP || condition.op == LT_OP || condition.op == EQ_OP))
                 return false;
             if (readVal - conditionVal == 0 &&
-                (condition.op  == LT_OP || condition.op == GT_OP))
+                (condition.op == LT_OP || condition.op == GT_OP))
                 return false;
             if (readVal - conditionVal < 0 &&
-                (condition.op  == GE_OP || condition.op == GT_OP || condition.op == EQ_OP))
+                (condition.op == GE_OP || condition.op == GT_OP || condition.op == EQ_OP))
                 return false;
         } else if (type == TypeVarChar) {
             int readStrLen;
@@ -176,46 +177,249 @@ namespace PeterDB {
         return -1;
     }
 
-    BNLJoin::BNLJoin(Iterator *leftIn, TableScan *rightIn, const Condition &condition, const unsigned int numPages) {
-
-    }
-
-    BNLJoin::~BNLJoin() {
-
-    }
-
-    RC BNLJoin::getNextTuple(void *data) {
-        return -1;
-    }
-
-    RC BNLJoin::getAttributes(std::vector<Attribute> &attrs) const {
-        return -1;
-    }
-    int getAttrIndex(const std::vector<Attribute> &attrs, const std::string &attr){
-        for (int i = 0; i < attrs.size(); i++){
+    int getAttrIndex(const std::vector<Attribute> &attrs, const std::string &attr) {
+        for (int i = 0; i < attrs.size(); i++) {
             if (attrs[i].name == attr)
                 return i;
         }
         return -1;
     }
-    Value getAttrValue(const void* data, const int index, const std::vector<Attribute> &attrs){
-        int offset = ceil((double)attrs.size() / 8.0);
-        for (int i = 0; i < index; i++){
-            bool isNULL = ((unsigned char*)data)[i / 8] & (1 << (8 - 1 - i % 8));
-            if (!isNULL){
+
+    Value getAttrValue(const void *data, const int index, const std::vector<Attribute> &attrs) {
+        int offset = ceil((double) attrs.size() / 8.0);
+        for (int i = 0; i < index; i++) {
+            bool isNULL = ((unsigned char *) data)[i / 8] & (1 << (8 - 1 - i % 8));
+            if (!isNULL) {
                 if (attrs[i].type == TypeInt)
                     offset += sizeof(int);
                 else if (attrs[i].type == TypeReal)
                     offset += sizeof(float);
                 else if (attrs[i].type == TypeVarChar)
-                    offset += sizeof(int) + *(int*)((char*)data + offset);
+                    offset += sizeof(int) + *(int *) ((char *) data + offset);
             }
         }
         Value res;
-        res.data = (char*)data + offset;
+        res.data = (char *) data + offset;
         res.type = attrs[index].type;
         return res;
     }
+
+    int getDataLength(void *data, std::vector<Attribute> attrs) {
+        int offset = 0;
+        int nullIndicatorSize = ceil((double) attrs.size() / 8.0);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        memcpy(nullIndicator, (char *) data + offset, nullIndicatorSize);
+        offset = offset + nullIndicatorSize;
+        for (int i = 0; i < attrs.size(); i++) {
+            if (!(nullIndicator[i / 8] & (1 << (7 - i % 8)))) {
+                if (attrs[i].type == TypeInt) offset += sizeof(int);
+                else if (attrs[i].type == TypeReal) offset += sizeof(float);
+                else if (attrs[i].type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, (char *) data + offset, 4);
+                    offset = offset + strLen + 4;
+                }
+            }
+        }
+        free(nullIndicator);
+        return offset;
+    }
+
+    int compareKey(AttrType attrType, const void *v1, const void *v2) {
+        //This is a helper function to compare two given keys v1 and v2.
+        //It assumes that both v1 and v2 are not null.
+        //If v1 > v2, it returns a positive number,
+        //if v1 < v2, it returns a negative number,
+        //if v1 = v2, it returns zero.
+        if (attrType == TypeInt) {
+            return *(int *) v1 - *(int *) v2;
+        } else if (attrType == TypeReal) {
+            return *(float *) v1 - *(float *) v2 > 0 ? 1 : *(float *) v1 - *(float *) v2 == 0 ? 0 : -1;
+        } else if (attrType == TypeVarChar) {
+            int strLen1 = *(int *) v1;
+            int strLen2 = *(int *) v2;
+            std::string s1((char *) v1 + sizeof(int), strLen1);
+            std::string s2((char *) v2 + sizeof(int), strLen2);
+            return s1.compare(s2);
+        }
+        return 0;
+    }
+
+    BNLJoin::BNLJoin(Iterator *leftIn, TableScan *rightIn, const Condition &condition, const unsigned int numPages) {
+        this->leftIn = leftIn;
+        this->rightIn = rightIn;
+        this->condition = condition;
+        this->numPages = numPages;
+        leftIn->getAttributes(this->leftAttrs);
+        rightIn->getAttributes(this->rightAttrs);
+        updateOutVector();
+        updateInnerVector();
+        outIndex = 0;
+        innerIndex = 0;
+    }
+
+    BNLJoin::~BNLJoin() {
+        for (auto &i:out) free(i.data);
+        for (auto &i:inner) free(i.data);
+    }
+
+    RC BNLJoin::updateOutVector() {
+        outSize = 0;
+        for (auto &i : this->out) free(i.data);
+        out.clear();
+        while (outSize < numPages * PAGE_SIZE) {
+            void *data = malloc(PAGE_SIZE);
+            if (leftIn->getNextTuple(data) != QE_EOF) {
+                int dataLen = getDataLength(data, leftAttrs);
+                outSize += dataLen;
+                Tuple tuple(data, dataLen);
+                out.push_back(tuple);
+                free(data);
+            } else {
+                free(data);
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    RC BNLJoin::updateInnerVector() {
+        innerSize = 0;
+        for (auto &i : this->inner) free(i.data);
+        inner.clear();
+        while (innerSize < PAGE_SIZE) {
+            void *data = malloc(PAGE_SIZE);
+            if (rightIn->getNextTuple(data) != QE_EOF) {
+                int dataLen = getDataLength(data, rightAttrs);
+                innerSize += dataLen;
+                Tuple tuple(data, dataLen);
+                inner.push_back(tuple);
+                free(data);
+            } else {
+                free(data);
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    RC BNLJoin::getNextTuple(void *data) {
+        while (true) {
+            while (outIndex < out.size()) {
+                //find R value
+                int outAttrIndex = getAttrIndex(leftAttrs, condition.lhsAttr);
+                char *outAttrVal = (char *) calloc(PAGE_SIZE, 1);
+                getAttrVal(outAttrVal, out[outIndex].data, outAttrIndex, leftAttrs);
+                //find S value
+                int innerAttrIndex = getAttrIndex(rightAttrs, condition.rhsAttr);
+                AttrType type = rightAttrs[innerAttrIndex].type;
+                for (int i = innerIndex; i < inner.size(); i++) {
+                    char *innerAttrVal = (char *) calloc(PAGE_SIZE, 1);
+                    getAttrVal(innerAttrVal, inner[i].data, innerAttrIndex, rightAttrs);
+                    char *cval = (char *) calloc(PAGE_SIZE, 1);
+                    getAttrVal(cval, inner[i].data, 1, rightAttrs);
+                    char *dval = (char *) calloc(PAGE_SIZE, 1);
+                    getAttrVal(dval, inner[i].data, 2, rightAttrs);
+                    if (compareKey(type, outAttrVal, innerAttrVal) == 0) {
+                        joinLeftAndRight(data, out[outIndex].data, out[outIndex].length, inner[i].data,
+                                         inner[i].length);
+                        free(outAttrVal);
+                        free(innerAttrVal);
+                        innerIndex = i + 1;
+                        return 0;
+                    }
+                    free(innerAttrVal);
+                    free(cval);
+                    free(dval);
+                }
+                free(outAttrVal);
+                outIndex++;
+            }
+            if (outIndex >= out.size()) {
+                updateInnerVector();
+                innerIndex = 0;
+                outIndex = 0;
+                if (inner.size() == 0) {
+                    updateOutVector();
+                    innerIndex = 0;
+                    outIndex = 0;
+                    rightIn->setIterator();
+                    updateInnerVector();
+                    if (out.size() == 0)
+                        return QE_EOF;
+                }
+            }
+        }
+    }
+
+    RC BNLJoin::getAttributes(std::vector<Attribute> &attrs) const {
+        attrs = this->leftAttrs;
+        attrs.insert(attrs.end(), this->rightAttrs.begin(), this->rightAttrs.end());
+        return 0;
+    }
+
+    RC BNLJoin::getAttrVal(void *val, void *data, int attrIndex, std::vector<Attribute> attrs) {
+        int offset = 0;
+        int nullIndicatorSize = ceil((double) attrs.size() / 8.0);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        memcpy(nullIndicator, (char *) data + offset, nullIndicatorSize);
+        offset = offset + nullIndicatorSize;
+        for (int i = 0; i < attrs.size(); i++) {
+            if (!(nullIndicator[i / 8] & (1 << (7 - i % 8)))) {
+                if (attrs[i].type == TypeInt) {
+                    if (i == attrIndex) {
+                        memcpy(val, (char *) data + offset, sizeof(int));
+                        break;
+                    }
+                    offset += sizeof(int);
+                } else if (attrs[i].type == TypeReal) {
+                    if (i == attrIndex) {
+                        memcpy(val, (char *) data + offset, sizeof(float));
+                        break;
+                    }
+                    offset += sizeof(float);
+                } else if (attrs[i].type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, (char *) data + offset, 4);
+                    if (i == attrIndex) {
+                        memcpy(val, (char *) data + offset, strLen + sizeof(int));
+                        break;
+                    }
+                    offset = offset + strLen + 4;
+                }
+            }
+        }
+        free(nullIndicator);
+        return 0;
+    }
+
+    RC BNLJoin::joinLeftAndRight(void *data, void *outData, int outLen, void *innerData, int innerLen) {
+        int offset = 0, offset2 = 0;
+        int outSize = leftAttrs.size(), innerSize = rightAttrs.size();
+        int nullIndicatorSize1 = ceil((double) outSize / 8.0), nullIndicatorSize2 = ceil((double) innerSize / 8.0);
+        char *nullIndicator1 = (char *) malloc(nullIndicatorSize1);
+        memcpy(nullIndicator1, (char *) outData + offset, nullIndicatorSize1);
+        char *nullIndicator2 = (char *) malloc(nullIndicatorSize2);
+        memcpy(nullIndicator2, (char *) innerData + offset, nullIndicatorSize2);
+
+        int resNullIndicatorSize = ceil((double) (outSize + innerSize) / 8);
+        int resOffset = resNullIndicatorSize;
+        memcpy((char *) data, nullIndicator1, nullIndicatorSize1);
+        for (int i = outSize; i < outSize + innerSize; i++) {
+            if (!(nullIndicator2[(i - outSize) / 8] & (1 << (7 - (i - outSize) % 8)))) {
+                ((char *) data)[i / 8] = ((char *) data)[i / 8] & (0 << (7 - (i - nullIndicatorSize1) % 8));
+            } else {
+                ((char *) data)[i / 8] = ((char *) data)[i / 8] | (1 << (7 - (i - nullIndicatorSize1) % 8));
+            }
+        }
+        memcpy((char *) data + resOffset, (char *) outData + nullIndicatorSize1, outLen - nullIndicatorSize1);
+        resOffset += outLen - nullIndicatorSize1;
+        memcpy((char *) data + resOffset, (char *) innerData + nullIndicatorSize2, innerLen - nullIndicatorSize2);
+        free(nullIndicator1);
+        free(nullIndicator2);
+        return 0;
+    }
+
     //leftIn getNextTuple:rid,data(nullindicator of returned attributes+real data), rightIn getNextTuple: key, rid
     INLJoin::INLJoin(Iterator *leftIn, IndexScan *rightIn, const Condition &condition) {
         this->leftIn = leftIn;
@@ -223,10 +427,10 @@ namespace PeterDB {
         this->condition = condition;
         leftIn->getAttributes(this->leftAttrs);
         this->leftIndex = getAttrIndex(this->leftAttrs, condition.lhsAttr);
-        this->leftBuffer = (char*)calloc(PAGE_SIZE, 1);
+        this->leftBuffer = (char *) calloc(PAGE_SIZE, 1);
         rightIn->getAttributes(this->rightAttrs);
         this->rightIndex = getAttrIndex(this->rightAttrs, condition.rhsAttr);
-        this->rightBuffer = (char*)calloc(PAGE_SIZE, 1);
+        this->rightBuffer = (char *) calloc(PAGE_SIZE, 1);
     }
 
     INLJoin::~INLJoin() {
@@ -235,7 +439,7 @@ namespace PeterDB {
     }
 
     RC INLJoin::getNextTuple(void *data) {
-        while (leftIn->getNextTuple(leftBuffer) != QE_EOF){
+        while (leftIn->getNextTuple(leftBuffer) != QE_EOF) {
             Value leftVal = getAttrValue(this->leftBuffer, this->leftIndex, this->leftAttrs);
             this->rightIn->setIterator(leftVal.data, leftVal.data, true, true);
             if (rightIn->getNextTuple(this->rightBuffer) != QE_EOF)
@@ -245,66 +449,68 @@ namespace PeterDB {
     }
 
     RC INLJoin::getAttributes(std::vector<Attribute> &attrs) const {
-        attrs= this->leftAttrs;
+        attrs = this->leftAttrs;
         attrs.insert(attrs.end(), this->rightAttrs.begin(), this->rightAttrs.end());
         return 0;
     }
-    RC INLJoin::joinLeftAndRight(void *data){
-        int nullIndicatorSize = ceil((double)(this->leftAttrs.size() + this->rightAttrs.size()) / 8.0);
+
+    RC INLJoin::joinLeftAndRight(void *data) {
+        int nullIndicatorSize = ceil((double) (this->leftAttrs.size() + this->rightAttrs.size()) / 8.0);
         memset(data, 0, nullIndicatorSize);
         int offset = nullIndicatorSize;
         //copy left attributes
-        int leftOffset = ceil((double)this->leftAttrs.size() / 8.0);
-        for(int i = 0; i < this->leftAttrs.size(); i++){
-            char nullField = *((char*)data + i / 8);
+        int leftOffset = ceil((double) this->leftAttrs.size() / 8.0);
+        for (int i = 0; i < this->leftAttrs.size(); i++) {
+            char nullField = *((char *) data + i / 8);
             bool isNULL = this->leftBuffer[i / 8] & (1 << (8 - 1 - i % 8));
             if (isNULL) nullField += 1 << (8 - 1 - i % 8);
-            else{
+            else {
                 nullField += 0 << (8 - 1 - i % 8);
-                if (leftAttrs[i].type == TypeInt){
-                    memcpy((char*)data + offset, leftBuffer + leftOffset, sizeof(int));
+                if (leftAttrs[i].type == TypeInt) {
+                    memcpy((char *) data + offset, leftBuffer + leftOffset, sizeof(int));
                     offset += sizeof(int);
                     leftOffset += sizeof(int);
-                }else if (leftAttrs[i].type == TypeReal){
-                    memcpy((char*)data + offset, leftBuffer + leftOffset, sizeof(float));
+                } else if (leftAttrs[i].type == TypeReal) {
+                    memcpy((char *) data + offset, leftBuffer + leftOffset, sizeof(float));
                     offset += sizeof(float);
                     leftOffset += sizeof(float);
-                }else if (leftAttrs[i].type == TypeVarChar){
-                    int strLen = *(int*)(leftBuffer + leftOffset);
-                    memcpy((char*)data + offset, leftBuffer + leftOffset, sizeof(int) + strLen);
+                } else if (leftAttrs[i].type == TypeVarChar) {
+                    int strLen = *(int *) (leftBuffer + leftOffset);
+                    memcpy((char *) data + offset, leftBuffer + leftOffset, sizeof(int) + strLen);
                     offset += sizeof(int) + strLen;
                     leftOffset += sizeof(int) + strLen;
                 }
             }
-            ((unsigned char*)data)[i / 8] = nullField;
+            ((unsigned char *) data)[i / 8] = nullField;
         }
         //copy right attributes
-        int rightOffset = ceil((double)this->rightAttrs.size() / 8.0);
-        for (size_t i = 0; i < this->rightAttrs.size(); i++){
-            char nullField = ((char*)data)[(i + this->leftAttrs.size()) / 8];
+        int rightOffset = ceil((double) this->rightAttrs.size() / 8.0);
+        for (size_t i = 0; i < this->rightAttrs.size(); i++) {
+            char nullField = ((char *) data)[(i + this->leftAttrs.size()) / 8];
             bool isNULL = this->rightBuffer[i / 8] & (1 << (8 - 1 - i % 8));
             if (isNULL) nullField += 1 << (8 - 1 - (i + this->leftAttrs.size()) % 8);
-            else{
+            else {
                 nullField += 0 << (8 - 1 - (i + this->leftAttrs.size()) % 8);
-                if (rightAttrs[i].type == TypeInt){
-                    memcpy((char*)data + offset, rightBuffer + rightOffset, sizeof(int));
+                if (rightAttrs[i].type == TypeInt) {
+                    memcpy((char *) data + offset, rightBuffer + rightOffset, sizeof(int));
                     offset += sizeof(int);
                     rightOffset += sizeof(int);
-                }else if (rightAttrs[i].type == TypeReal){
-                    memcpy((char*)data + offset, rightBuffer + rightOffset, sizeof(float));
+                } else if (rightAttrs[i].type == TypeReal) {
+                    memcpy((char *) data + offset, rightBuffer + rightOffset, sizeof(float));
                     offset += sizeof(float);
                     rightOffset += sizeof(float);
-                }else if (rightAttrs[i].type == TypeVarChar){
-                    int strLen = *(int*)(rightBuffer + rightOffset);
-                    memcpy((char*)data + offset, rightBuffer + rightOffset, sizeof(int) + strLen);
+                } else if (rightAttrs[i].type == TypeVarChar) {
+                    int strLen = *(int *) (rightBuffer + rightOffset);
+                    memcpy((char *) data + offset, rightBuffer + rightOffset, sizeof(int) + strLen);
                     offset += sizeof(int) + strLen;
                     rightOffset += sizeof(int) + strLen;
                 }
             }
-            ((unsigned char*)data)[(i + this->leftAttrs.size()) / 8] = nullField;
+            ((unsigned char *) data)[(i + this->leftAttrs.size()) / 8] = nullField;
         }
         return 0;
     }
+
     GHJoin::GHJoin(Iterator *leftIn, Iterator *rightIn, const Condition &condition, const unsigned int numPartitions) {
 
     }

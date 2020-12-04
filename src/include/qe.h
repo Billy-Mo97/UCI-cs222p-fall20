@@ -161,6 +161,7 @@ namespace PeterDB {
     public:
         Iterator *input;
         Condition condition;
+
         Filter(Iterator *input,               // Iterator of input R
                const Condition &condition     // Selection condition
         );
@@ -192,6 +193,18 @@ namespace PeterDB {
         RC getAttributes(std::vector<Attribute> &attrs) const override;
     };
 
+    class Tuple {
+    public:
+        void *data;
+        int length;
+
+        Tuple(void *data, int length) {
+            this->length = length;
+            this->data = malloc(length);
+            memcpy((char *) this->data, (char *) data, length);
+        }
+    };
+
     class BNLJoin : public Iterator {
         // Block nested-loop join operator
     public:
@@ -204,10 +217,31 @@ namespace PeterDB {
 
         ~BNLJoin() override;
 
+        Iterator *leftIn;
+        TableScan *rightIn;
+        Condition condition;
+        int outIndex;
+        int innerIndex;
+        unsigned numPages;
+        std::vector<Attribute> leftAttrs;
+        std::vector<Attribute> rightAttrs;
+        std::vector<Tuple> out;
+        std::vector<Tuple> inner;
+        int outSize;
+        int innerSize;
+
         RC getNextTuple(void *data) override;
 
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
+
+        RC updateOutVector();
+
+        RC updateInnerVector();
+
+        RC getAttrVal(void *val, void *data, int attrIndex, std::vector<Attribute> attrs);
+
+        RC joinLeftAndRight(void *data, void *outData, int outLen, void *innerData, int innerLen);
     };
 
     class INLJoin : public Iterator {
@@ -221,18 +255,21 @@ namespace PeterDB {
         ~INLJoin() override;
 
         RC getNextTuple(void *data) override;
-        RC joinLeftAndRight(void*data);
+
+        RC joinLeftAndRight(void *data);
+
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
-        Iterator* leftIn;
-        IndexScan* rightIn;
+
+        Iterator *leftIn;
+        IndexScan *rightIn;
         Condition condition;
         int leftIndex;
         int rightIndex;
         std::vector<Attribute> leftAttrs;
         std::vector<Attribute> rightAttrs;
-        char* leftBuffer;
-        char* rightBuffer;
+        char *leftBuffer;
+        char *rightBuffer;
         bool end;
     };
 
