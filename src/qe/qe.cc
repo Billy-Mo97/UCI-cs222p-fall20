@@ -531,12 +531,65 @@ namespace PeterDB {
         this->groupby = false;
     }
 
-    Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, const Attribute &groupAttr, AggregateOp op) {
+    bool Value::operator<(const Value &right) const {
+        return (this->type == right.type) && compareKey(type, this->data, right.data) < 0;
+    }
 
+    Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, const Attribute &groupAttr, AggregateOp op) {
+        this->input = input;
+        this->aggAttr = aggAttr;
+        this->groupAttr = groupAttr;
+        this->op = op;
+        this->input->getAttributes(this->attrs);
+        this->attrIndex = getAttrIndex(this->attrs, aggAttr.name);
+        this->end = false;
+        this->groupby = true;
+        char *temp = (char *) malloc(PAGE_SIZE);
+        int groupAttrIndex = getAttrIndex(attrs, groupAttr.name);
+        while (this->input->getNextTuple(temp) != QE_EOF) {
+            Value groupVal = getAttrValue(temp, groupAttrIndex, attrs);
+            Value key;
+            int keyLength = 0;
+            if (groupVal.type == TypeInt) keyLength = sizeof(int);
+            else if (groupVal.type == TypeReal) keyLength = sizeof(float);
+            else if (groupVal.type == TypeVarChar) keyLength = sizeof(int) + *(int *) groupVal.data;
+            key.type = groupVal.type;
+            Value resultVal = getAttrValue(temp, attrIndex, attrs);
+            AggregateByGroupResult aggregateByGroupResult;
+            if (groupResult.find(groupVal) != groupResult.end()) {
+                aggregateByGroupResult = groupResult[groupVal];
+                key.data = groupVal.data;
+            } else {
+                key.data = malloc(keyLength);
+                memcpy(key.data, groupVal.data, keyLength);
+            }
+            if (resultVal.type == TypeInt) {
+                int val = *(int *) resultVal.data;
+                aggregateByGroupResult.sum += val;
+                aggregateByGroupResult.count++;
+                aggregateByGroupResult.avg = aggregateByGroupResult.sum / aggregateByGroupResult.count;
+                aggregateByGroupResult.min = val < aggregateByGroupResult.min ? val : aggregateByGroupResult.min;
+                aggregateByGroupResult.max = val > aggregateByGroupResult.max ? val : aggregateByGroupResult.max;
+            } else if (resultVal.type == AttrType::TypeReal) {
+                float val = *(float *) resultVal.data;
+                aggregateByGroupResult.sum += val;
+                aggregateByGroupResult.count++;
+                aggregateByGroupResult.avg = aggregateByGroupResult.sum / aggregateByGroupResult.count;
+                aggregateByGroupResult.min = val < aggregateByGroupResult.min ? val : aggregateByGroupResult.min;
+                aggregateByGroupResult.max = val > aggregateByGroupResult.max ? val : aggregateByGroupResult.max;
+            }
+            int k = *(int *) groupVal.data;
+            if (groupResult.find(groupVal) != groupResult.end()) groupResult[key] = aggregateByGroupResult;
+            else groupResult.insert(std::make_pair(key, aggregateByGroupResult));
+
+        }
+        if (groupResult.size() == 0) this->end = true;
+        else groupResultIter = groupResult.begin();
+        free(temp);
     }
 
     Aggregate::~Aggregate() {
-
+        for (auto &i : groupResult) free(i.first.data);
     }
 
     RC Aggregate::getNextTuple(void *data) {
@@ -577,6 +630,35 @@ namespace PeterDB {
             }
             free(temp);
             end = true;
+        } else {
+            if (groupResultIter != groupResult.end()) {
+                int keyLength = 0;
+                if (groupResultIter->first.type == TypeInt) keyLength = sizeof(int);
+                else if (groupResultIter->first.type == TypeReal) keyLength = sizeof(float);
+                else if (groupResultIter->first.type == TypeVarChar) keyLength = sizeof(int) +
+                                                                                 *(int *) groupResultIter->first.data;
+                memcpy((char *) data + 1, groupResultIter->first.data, keyLength);
+                float count = groupResultIter->second.count;
+                if (op == AVG) {
+                    if (count == 0) return QE_EOF;
+                    memcpy((char *) data + 1 + keyLength, &groupResultIter->second.avg, sizeof(float));
+                } else if (op == SUM) {
+                    if (count == 0) return QE_EOF;
+                    memcpy((char *) data + 1 + keyLength, &groupResultIter->second.sum, sizeof(float));
+                } else if (op == MAX) {
+                    if (count == 0) return QE_EOF;
+                    memcpy((char *) data + 1 + keyLength, &groupResultIter->second.max, sizeof(float));
+                } else if (op == MIN) {
+                    if (count == 0) return QE_EOF;
+                    memcpy((char *) data + 1 + keyLength, &groupResultIter->second.min, sizeof(float));
+                } else if (op == COUNT) {
+                    memcpy((char *) data + 1 + keyLength, &groupResultIter->second.count, sizeof(float));
+                }
+                groupResultIter++;
+            } else {
+                this->end = true;
+                return QE_EOF;
+            }
         }
         return 0;
     }
@@ -585,10 +667,17 @@ namespace PeterDB {
         attrs.clear();
         Attribute attr = this->aggAttr;
         std::string dic[] = {"MIN", "MAX", "COUNT", "SUM", "AVG"};
-        attr.name = dic[op] + "(" + aggAttr.name + ")";
-        attr.type = TypeReal;
-        attr.length = sizeof(float);
-        attrs.push_back(attr);
+        if (groupby) {
+            attr.name = groupAttr.name + " " + dic[op] + "(" + aggAttr.name + ")";
+            attr.type = TypeReal;
+            attr.length = sizeof(float);
+            attrs.push_back(attr);
+        } else {
+            attr.name = dic[op] + "(" + aggAttr.name + ")";
+            attr.type = TypeReal;
+            attr.length = sizeof(float);
+            attrs.push_back(attr);
+        }
         return 0;
     }
 } // namespace PeterDB
