@@ -1093,14 +1093,14 @@ namespace PeterDB {
         return 0;
     }
 
-    RC BTree::getKeyLen(char *data, short &offset, short &keyLen) const {
+    RC BTree::getKeyLen(char *data, short &slotOffset, short &keyLen) const {
         if (attrType == TypeInt) {
             keyLen = sizeof(int);
         } else if (attrType == TypeReal) {
             keyLen = sizeof(float);
         } else if (attrType == TypeVarChar) {
             int strLen;
-            memcpy(&strLen, data + offset, sizeof(int));
+            memcpy(&strLen, data + slotOffset, sizeof(int));
             keyLen = sizeof(int) + strLen;
         }
         return 0;
@@ -1138,7 +1138,7 @@ namespace PeterDB {
             short slotOffset;
             memcpy(&slotOffset, data + PAGE_SIZE - (i + 2) * sizeof(short), sizeof(short));
             short keyLen = 0;
-            if (getKeyLen(data, offset, keyLen) == -1) { return -1; }
+            if (getKeyLen(data, slotOffset, keyLen) == -1) { return -1; }
             InternalEntry entry(attrType, data + slotOffset);
             if (getLeftInternalEntry(entry, data, slotOffset) == -1) { return -1; }
             if (getRightInternalEntry(entry, data, slotOffset, keyLen) == -1) { return -1; }
@@ -1194,7 +1194,7 @@ namespace PeterDB {
                 dynamic_cast<LeafNode *>(res)->leafEntries.push_back(deletedEntry);
             }else{
                 short keyLen = 0;
-                if (getKeyLen(data, offset, keyLen) == -1) { return -1; }
+                if (getKeyLen(data, slotOffset, keyLen) == -1) { return -1; }
                 RID rid;
                 memcpy(&rid.pageNum, data + slotOffset + keyLen, sizeof(PageNum));
                 memcpy(&rid.slotNum, data + slotOffset + keyLen + sizeof(PageNum), sizeof(short));

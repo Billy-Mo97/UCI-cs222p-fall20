@@ -703,12 +703,17 @@ namespace PeterDB {
                 PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
                 PeterDB::IXFileHandle ixFileHandle;
                 std::string indexFileName = tableName + a.name + ".idx";
-                if (ix.openFile(indexFileName, ixFileHandle) == -1) return -1;
-                if (ix.insertEntry(ixFileHandle, a, (char *) data + offset, rid) == -1) return -1;
-                if (a.type == TypeInt) offset += sizeof(int);
-                else if (a.type == TypeReal) offset += sizeof(float);
-                else if (a.type == TypeVarChar) offset += sizeof(int) + *(int *) ((char *) data + offset);
+                if (ix.openFile(indexFileName, ixFileHandle) == -1) { return -1; }
+
+                if (ix.insertEntry(ixFileHandle, a, (char *) data + offset, rid) == -1) { return -1; }
+
                 ix.closeFile(ixFileHandle);
+            }
+            if (a.type == TypeInt) offset += sizeof(int);
+            else if (a.type == TypeReal) offset += sizeof(float);
+            else if (a.type == TypeVarChar) {
+                int strLen = *(int *) ((char *) data + offset);
+                offset += sizeof(int) + *(int *) ((char *) data + offset);
             }
         }
         return 0;
@@ -999,16 +1004,18 @@ namespace PeterDB {
         std::string indexFileName = tableName + attributeName + ".idx";
         PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
         PeterDB::IXFileHandle ixFileHandle;
-        if (ix.createFile(indexFileName) == -1) return -1;
+        if (ix.createFile(indexFileName) == -1) { return -1; }
         //insert entries into index file
         std::vector<std::string> attributeNameVec;
         attributeNameVec.push_back(attributeName);
         scan(tableName, "", NO_OP, NULL, attributeNameVec, rmsi);
-        if (ix.openFile(indexFileName, ixFileHandle) == -1) return -1;
+        if (ix.openFile(indexFileName, ixFileHandle) == -1) { return -1; }
         void *key = malloc(keyLength); //The key contains the nullIndicator
         while (rmsi.getNextTuple(rid, key) != RM_EOF) {
-            if (ix.insertEntry(ixFileHandle, keyAttribute, (char *) key + 1, rid) == -1) return -1;
+            int numOfPages = ixFileHandle.numOfPages;
+            if (ix.insertEntry(ixFileHandle, keyAttribute, (char *) key + 1, rid) == -1) { return -1; }
         }
+        if (ix.closeFile(ixFileHandle) == -1) { return -1; }
         rmsi.close();
         return 0;
     }

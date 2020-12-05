@@ -303,7 +303,7 @@ namespace PeterDB {
 
         RC generateNodeHeader(Node *&res, char *data, short &offset, short &slotCount);
 
-        RC getKeyLen(char *data, short &offset, short &keyLen) const;
+        RC getKeyLen(char *data, short &slotOffset, short &keyLen) const;
 
         RC getLeftInternalEntry(InternalEntry &entry, const char *data, short slotOffset);
 

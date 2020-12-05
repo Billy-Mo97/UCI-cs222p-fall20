@@ -151,6 +151,8 @@ namespace PeterDB {
             for (Attribute &attribute : attributes) {
                 attribute.name = tableName + "." + attribute.name;
             }
+
+            return 0;
         };
 
         ~IndexScan() override {
@@ -169,8 +171,6 @@ namespace PeterDB {
         );
 
         ~Filter() override;
-
-        RC getAttributeName(std::string attr, std::string &attrName);
 
         RC getAttributeValue(void *data, std::vector<Attribute> attributes, int condIndex, void *value, int &dataLen);
 
