@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <map>
 
 #include "rm.h"
 #include "ix.h"
@@ -183,9 +184,15 @@ namespace PeterDB {
     class Project : public Iterator {
         // Projection operator
     public:
+        Iterator *input;
+        std::vector<std::string> attrNames;
         Project(Iterator *input,                                // Iterator of input R
                 const std::vector<std::string> &attrNames);     // std::vector containing attribute names
         ~Project() override;
+
+        RC getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap);
+
+        RC getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value, int &dataLen);
 
         RC getNextTuple(void *data) override;
 

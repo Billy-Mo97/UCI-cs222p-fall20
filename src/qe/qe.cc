@@ -114,7 +114,6 @@ namespace PeterDB {
         int condIndex = -1;
         for (int i = 0; i < attributes.size(); i++) {
             std::string condName = condition.lhsAttr;
-            //if (getAttributeName(condition.lhsAttr, condName) == -1) { continue; }
             if (condName == attributes[i].name) {
                 condIndex = i;
                 break;
@@ -148,19 +147,169 @@ namespace PeterDB {
     }
 
     Project::Project(Iterator *input, const std::vector<std::string> &attrNames) {
-
+        this->input = input;
+        for (auto attrName : attrNames) {
+            this->attrNames.push_back(attrName);
+        }
     }
 
     Project::~Project() {
 
     }
 
+    RC Project::getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap) {
+        std::vector<Attribute> attributes;
+        if (getAttributes(attributes) == -1) { return -1; }
+        int dataNullIndicatorSize = ceil(allAttributes.size() / 8.0);
+        std::vector<int> starts;
+        int start = dataNullIndicatorSize;
+        for (auto attr : allAttributes) {
+            starts.push_back(start);
+            AttrType type = attr.type;
+            start += attr.length;
+        }
+        for (int i = 0; i < attributes.size(); i++) {
+            Attribute attr = attributes[i];
+            int index = output[i];
+            attrMap[index] = starts[index];
+        }
+        return 0;
+    }
+
+    RC Project::getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value, int &dataLen) {
+        int dataNullIndicatorSize = ceil(allAttributes.size() / 8.0);
+        char *dataNullIndicator = (char *) malloc(dataNullIndicatorSize);
+        memset(dataNullIndicator, 0, dataNullIndicatorSize);
+        memcpy(dataNullIndicator, data, dataNullIndicatorSize);
+
+        int nullIndicatorSize = ceil(output.size() / 8.0);
+        char *nullIndicator = (char *) malloc(nullIndicatorSize);
+        memset(nullIndicator,0,nullIndicatorSize);
+        char nullField = 0;
+        for (int p = 0; p < output.size(); p++) {
+            int nullBit = dataNullIndicator[output[p] / 8] & (1 << (8 - 1 - output[p] % 8));
+            if (nullBit != 0 ) {
+                int rightMost = 8 - (p % 8 + 1);
+                nullField += 1 << rightMost;
+            }
+
+            if (p % 8 == 7 || p == output.size() - 1) {
+                nullIndicator[p / 8] = nullField;
+                nullField = 0;
+            }
+        }
+
+        memcpy(value, nullIndicator, nullIndicatorSize);
+        int dataOffset = dataNullIndicatorSize;
+        int offset = nullIndicatorSize;
+
+        std::map<int, int> attrMap;
+        if (getFieldsStart(allAttributes, output, attrMap) == -1) { return -1; }
+        std::vector<Attribute> attributes;
+        if (getAttributes(attributes) == -1) { return -1; }
+        for (int i = 0; i < attributes.size(); i++) {
+            Attribute attr = attributes[i];
+            int nullBit = nullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
+            if (nullBit == 0) {
+                int start = attrMap[output[i]];
+                AttrType type = allAttributes[i].type;
+                if (type == TypeInt) {
+                    memcpy((char *) value + offset, (char *) data + start, sizeof(int));
+                    offset += sizeof(int);
+                } else if (type == TypeReal) {
+                    float val;
+                    memcpy(&val,  (char *) data + dataOffset, sizeof(float));
+                    memcpy((char *) value + offset, (char *) data + start, sizeof(float));
+                    offset += sizeof(float);
+                } else if (type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, (char *) data + dataOffset, sizeof(int));
+                    memcpy((char *) value + offset, (char *) data + start, sizeof(int) + strLen);
+                    offset += sizeof(int) + strLen;
+                }
+            }
+        }
+
+        /*for (int i = 0; i < allAttributes.size(); i++) {
+            int nullBit = dataNullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
+            if (nullBit == 0) {
+                AttrType type = allAttributes[i].type;
+                if (type == TypeInt) {
+                    if (find(output.begin(), output.end(), i) != output.end()) {
+                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(int));
+                        offset += sizeof(int);
+                    }
+                    dataOffset += sizeof(int);
+                } else if (type == TypeReal) {
+                    if (find(output.begin(), output.end(), i) != output.end()) {
+                        float val;
+                        memcpy(&val,  (char *) data + dataOffset, sizeof(float));
+                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(float));
+                        offset += sizeof(float);
+                    }
+                    dataOffset += sizeof(float);
+                } else if (type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, (char *) data + dataOffset, sizeof(int));
+                    if (find(output.begin(), output.end(), i) != output.end()) {
+                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(int) + strLen);
+                        offset += sizeof(int) + strLen;
+                    }
+                    dataOffset += sizeof(int) + strLen;
+                }
+            }
+        }*/
+
+        dataLen = offset;
+        free(dataNullIndicator);
+        free(nullIndicator);
+
+        return 0;
+    }
+
     RC Project::getNextTuple(void *data) {
-        return -1;
+        std::vector<Attribute> allAttributes;
+        if (input->getAttributes(allAttributes) == -1) { return -1; }
+        std::vector<int> output;
+
+        for (auto attrName : attrNames) {
+            for (int i = 0; i < allAttributes.size(); i++) {
+                if (attrName == allAttributes[i].name) {
+                    output.push_back(i);
+                }
+            }
+        }
+
+
+        void *returnedData = malloc(PAGE_SIZE);
+        memset(returnedData, 0, PAGE_SIZE);
+        if (input->getNextTuple(returnedData) != QE_EOF) {
+            void *value = malloc(PAGE_SIZE);
+            int dataLen;
+            if (getAttributeValue(returnedData, allAttributes, output, value, dataLen) == -1) { return -1; }
+            memcpy(data, value, dataLen);
+            free(returnedData);
+            free(value);
+            return 0;
+        } else {
+            free(returnedData);
+            return QE_EOF;
+        }
     }
 
     RC Project::getAttributes(std::vector<Attribute> &attrs) const {
-        return -1;
+        attrs.clear();
+        if (input == nullptr) { return -1; }
+        std::vector<Attribute> allAttributes;
+        if (input->getAttributes(allAttributes) == -1) { return -1; }
+        for (auto attrName : attrNames) {
+            for (auto attr : allAttributes) {
+                if (attrName == attr.name) {
+                    attrs.push_back(attr);
+                }
+            }
+        }
+        return 0;
     }
 
     int getAttrIndex(const std::vector<Attribute> &attrs, const std::string &attr) {

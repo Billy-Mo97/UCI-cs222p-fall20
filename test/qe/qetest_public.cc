@@ -242,6 +242,7 @@ namespace PeterDBTesting {
         // Go over the data through iterator
         std::vector<std::string> printed;
         ASSERT_EQ(project.getAttributes(attrs), success) << "Project.getAttributes() should succeed.";
+        int attrsSize = attrs.size();
         while (project.getNextTuple(outBuffer) != QE_EOF) {
             // Null indicators should be placed in the beginning.
             std::stringstream stream;
@@ -585,7 +586,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(QE_Test, ghjoin_on_int) {
+    /*TEST_F(QE_Test, ghjoin_on_int) {
         // Extra credit
         // 1. GHJoin -- on TypeInt Attribute
         // SELECT * from left, right WHERE left.B = right.B
@@ -814,6 +815,6 @@ namespace PeterDBTesting {
             checkPrintRecord(expected[i], printed[i], false, {}, true);
         }
 
-    }
+    }*/
 
 } // namespace PeterDBTesting
