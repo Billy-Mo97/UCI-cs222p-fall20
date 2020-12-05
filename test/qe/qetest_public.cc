@@ -39,9 +39,9 @@ namespace PeterDBTesting {
         attr.name = "C";
         attr.type = PeterDB::TypeReal;
         attr.length = 4;
-        //ix.openFile("leftC.idx",ixFileHandle);
-        //ix.printBTree(ixFileHandle, attr, std::cout);
-        //ix.closeFile(ixFileHandle);
+        ix.openFile("leftC.idx",ixFileHandle);
+        ix.printBTree(ixFileHandle, attr, std::cout);
+        ix.closeFile(ixFileHandle);
         destroyFile = false; // prevent from double deletion
 
         // Destroy the file

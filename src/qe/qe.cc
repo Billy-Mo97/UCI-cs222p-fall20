@@ -10,20 +10,6 @@ namespace PeterDB {
 
     }
 
-    RC Filter::getAttributeName(std::string attr, std::string &attrName) {
-        int delimiter = -1;
-        for (int i = 0; i < attr.size(); i++) {
-            if (attr[i] == '.') {
-                delimiter = i;
-                break;
-            }
-        }
-        if (delimiter == -1) { return -1; }
-        int attrNameLen = attr.size() - 1 - delimiter + 1;
-        attrName = attr.substr(delimiter + 1, attrNameLen);
-        return 0;
-    }
-
     RC
     Filter::getAttributeValue(void *data, std::vector<Attribute> attributes, int condIndex, void *value, int &dataLen) {
         int dataOffset = 0;
