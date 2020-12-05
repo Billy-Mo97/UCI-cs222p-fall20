@@ -36,6 +36,7 @@ namespace PeterDB {
         ~RM_IndexScanIterator();    // Destructor
         PeterDB::IX_ScanIterator ixScanIterator;
         PeterDB::IXFileHandle ixFileHandle;
+
         // "key" follows the same format as in IndexManager::insertEntry()
         RC getNextEntry(RID &rid, void *key);    // Get next matching entry
         RC close();                              // Terminate index scan
@@ -52,12 +53,15 @@ namespace PeterDB {
         void prepareTableData(int tableId, std::string tableName, std::string fileName, int tableFlag,
                               std::vector<Attribute> &tableAttributeDescriptor, void *tableData);
 
-        void prepareColumnAttribute(std::vector<Attribute> &columnAttributeDescriptor, std::string columnName, int &columnDataSize);
+        void prepareColumnAttribute(std::vector<Attribute> &columnAttributeDescriptor, std::string columnName,
+                                    int &columnDataSize);
 
         void prepareColumnData(int tableId, std::string columnName, AttrType columnType, int columnLength,
-                               int columnPosition, int tableFlag,int hasIndex, std::vector<Attribute> &columnAttributeDescriptor, void *columnData);
+                               int columnPosition, int tableFlag, int hasIndex,
+                               std::vector<Attribute> &columnAttributeDescriptor, void *columnData);
 
         int getMaxTableID();
+
         RC checkCatalog();
 
         RC createCatalog();
@@ -99,9 +103,14 @@ namespace PeterDB {
         RC addAttribute(const std::string &tableName, const Attribute &attr);
 
         RC dropAttribute(const std::string &tableName, const std::string &attributeName);
-        RC getAttributeFromIndex(int tableId, const std::string &attributeName, Attribute& attribute);
-        RC changeIndexInColumns(int tableId, const std::string &attributeName, int index);
+
+        RC getAttributeFromIndex(int tableId, const std::string &attributeName, Attribute &attribute);
+
+        RC changeIndexInColumns(int tableId, const std::string &attributeName, int index, int &keyLength,
+                                Attribute &keyAttribute);
+
         int hasIndex(const std::string &tableName, const std::string &attributeName);
+
         // QE IX related
         RC createIndex(const std::string &tableName, const std::string &attributeName);
 

@@ -922,22 +922,13 @@ namespace PeterDB {
         return 0;
     }
 
-    RC RelationManager::createIndex(const std::string &tableName, const std::string &attributeName) {
-        if (checkCatalog() == -1) { return -1; }
-        //std::cout<<"checkCatalog complete\n";
-        int tableId;
-        std::string fileName;
-        if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
-        //change the value of hasIndex in Columns table
-        int keyLength;
-        Attribute keyAttribute;
+    RC RelationManager::changeIndexInColumns(int tableId, const std::string &attributeName, int index, int &keyLength,
+                                             Attribute &keyAttribute) {
         std::vector<std::string> attribute;
         attribute.push_back("column-name");
         attribute.push_back("column-type");
         attribute.push_back("column-length");
         attribute.push_back("column-position");
-        attribute.push_back("table-flag");
-        attribute.push_back("hasIndex");
         int nullIndicatorSize = 1;
         void *data = malloc(sizeof(int));
         memcpy((char *) data, &tableId, sizeof(int));
@@ -973,9 +964,8 @@ namespace PeterDB {
                 prepareColumnAttribute(columnAttributeDescriptor, attr.name, columnDataSize);
                 columnData = malloc(columnDataSize);
                 memset(columnData, 0, columnDataSize);
-                //std::cout << "Creating table: ready for " << i << " th attr to insert into \"Columns\".\n";
                 prepareColumnData(tableId, attr.name, attr.type, attr.length, pos,
-                                  User, 1, columnAttributeDescriptor, columnData);
+                                  User, index, columnAttributeDescriptor, columnData);
                 PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
                 PeterDB::FileHandle fileHandle;
                 rbfm.openFile("Columns", fileHandle);
@@ -991,7 +981,20 @@ namespace PeterDB {
         }
         free(returnedData);
         rmsi.close();
-        //std::cout<<"scan column complete\n";
+        return 0;
+    }
+
+    RC RelationManager::createIndex(const std::string &tableName, const std::string &attributeName) {
+        if (checkCatalog() == -1) { return -1; }
+        int tableId;
+        std::string fileName;
+        if (getTableInfo(tableName, tableId, fileName) == -1) { return -1; }
+        //change the value of hasIndex in Columns table
+        int keyLength;
+        Attribute keyAttribute;
+        changeIndexInColumns(tableId, attributeName, 1, keyLength, keyAttribute);
+        RM_ScanIterator rmsi;
+        RID rid;
         //Create index file
         std::string indexFileName = tableName + attributeName + ".idx";
         PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
@@ -1018,66 +1021,7 @@ namespace PeterDB {
         //change the value of hasIndex in Columns table
         int keyLength;
         Attribute keyAttribute;
-        std::vector<std::string> attribute;
-        attribute.push_back("column-name");
-        attribute.push_back("column-type");
-        attribute.push_back("column-length");
-        attribute.push_back("column-position");
-        attribute.push_back("table-flag");
-        attribute.push_back("hasIndex");
-        int nullIndicatorSize = 1;
-        void *data = malloc(sizeof(int));
-        memcpy((char *) data, &tableId, sizeof(int));
-        RM_ScanIterator rmsi;
-        RID rid;
-        scan("Columns", "table-id", EQ_OP, data, attribute, rmsi);
-        free(data);
-        void *returnedData = malloc(PAGE_SIZE);
-        while (rmsi.getNextTuple(rid, returnedData) != RM_EOF) {
-            Attribute attr;
-            int offset = 0;
-            int nameLen = *(int *) ((char *) returnedData + offset + nullIndicatorSize);
-            offset += sizeof(int);
-            char *name = (char *) malloc(nameLen + 1);
-            memcpy(name, (char *) returnedData + nullIndicatorSize + offset, nameLen);
-            name[nameLen] = '\0';
-            offset += nameLen;
-            attr.name = name;
-            if (attr.name == attributeName) {
-                int type = *(int *) ((char *) returnedData + offset + nullIndicatorSize);
-                offset += sizeof(AttrType);
-                attr.type = (AttrType) type;
-                int columnLength = *(int *) ((char *) returnedData + offset + nullIndicatorSize);
-                attr.length = (AttrLength) columnLength;
-                keyLength = columnLength;
-                keyAttribute = attr;
-                offset += sizeof(int);
-                int pos = *(int *) ((char *) returnedData + offset + nullIndicatorSize);
-                offset += sizeof(int);
-                std::vector<Attribute> columnAttributeDescriptor;
-                void *columnData = NULL;
-                int columnDataSize;
-                prepareColumnAttribute(columnAttributeDescriptor, attr.name, columnDataSize);
-                columnData = malloc(columnDataSize);
-                memset(columnData, 0, columnDataSize);
-                //std::cout << "Creating table: ready for " << i << " th attr to insert into \"Columns\".\n";
-                prepareColumnData(tableId, attr.name, attr.type, attr.length, pos,
-                                  User, 0, columnAttributeDescriptor, columnData);
-                PeterDB::RecordBasedFileManager &rbfm = PeterDB::RecordBasedFileManager::instance();
-                PeterDB::FileHandle fileHandle;
-                rbfm.openFile("Columns", fileHandle);
-                if (rbfm.updateRecord(fileHandle, columnAttributeDescriptor, columnData, rid) == -1) {
-                    return -1;
-                }
-                rbfm.closeFile(fileHandle);
-                free(columnData);
-                free(name);
-                break;
-            }
-            free(name);
-        }
-        free(returnedData);
-        rmsi.close();
+        changeIndexInColumns(tableId, attributeName, 0, keyLength, keyAttribute);
         //destroy index file
         std::string indexFileName = tableName + attributeName + ".idx";
         if (PeterDB::IndexManager::instance().destroyFile(indexFileName) == -1) return -1;

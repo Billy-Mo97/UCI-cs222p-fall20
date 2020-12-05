@@ -586,6 +586,8 @@ namespace PeterDB {
         Attribute attr = this->aggAttr;
         std::string dic[] = {"MIN", "MAX", "COUNT", "SUM", "AVG"};
         attr.name = dic[op] + "(" + aggAttr.name + ")";
+        attr.type = TypeReal;
+        attr.length = sizeof(float);
         attrs.push_back(attr);
         return 0;
     }
