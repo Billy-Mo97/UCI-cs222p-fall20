@@ -7,6 +7,7 @@
 
 #include "rm.h"
 #include "ix.h"
+#include "map"
 
 namespace PeterDB {
 
@@ -23,6 +24,7 @@ namespace PeterDB {
     typedef struct Value {
         AttrType type;          // type of value
         void *data;             // value
+        bool operator<(const Value &right) const;
     } Value;
 
     typedef struct Condition {
@@ -298,6 +300,23 @@ namespace PeterDB {
         RC getAttributes(std::vector<Attribute> &attrs) const override;
     };
 
+    class AggregateByGroupResult {
+    public:
+        float sum;
+        float count;
+        float max;
+        float min;
+        float avg;
+
+        AggregateByGroupResult() {
+            sum = 0;
+            count = 0;
+            max = std::numeric_limits<float>::min();
+            min = std::numeric_limits<float>::max();
+            avg = 0;
+        }
+    };
+
     class Aggregate : public Iterator {
         // Aggregation operator
     public:
@@ -317,15 +336,18 @@ namespace PeterDB {
         );
 
         ~Aggregate() override;
+
         Iterator *input;                              // Iterator of input R
         Attribute aggAttr;                            // The attribute over which we are computing an aggregate
         AggregateOp op;                               // Aggregate operation
         std::vector<Attribute> attrs;
+        Attribute groupAttr;
         int attrIndex;
         bool end;
-        //map<Value, AggregateResult> groupResult;
-        //map<Value, AggregateResult>::iterator groupResultIter;
         bool groupby;
+        std::map<Value, AggregateByGroupResult> groupResult;
+        std::map<Value, AggregateByGroupResult>::iterator groupResultIter;
+
         RC getNextTuple(void *data) override;
 
         // Please name the output attribute as aggregateOp(aggAttr)
