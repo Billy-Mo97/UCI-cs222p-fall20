@@ -240,6 +240,7 @@ namespace PeterDB {
         Node *root;
         Node *minLeaf;
         AttrType attrType;
+        int numOfNodes;
         std::unordered_map<PageNum, Node *> nodeMap;
 
         BTree();
@@ -302,11 +303,11 @@ namespace PeterDB {
 
         RC generateNodeHeader(Node *&res, char *data, short &offset, short &slotCount);
 
-        RC getKeyLen(char *data, short &offset, short &keyLen) const;
+        RC getKeyLen(char *data, short &slotOffset, short &keyLen) const;
 
         RC getLeftInternalEntry(InternalEntry &entry, const char *data, short slotOffset);
 
-        RC getRightInternalEntry(InternalEntry &entry, char *data, short offset, short keyLen);
+        RC getRightInternalEntry(InternalEntry &entry, char *data, short slotOffset, short keyLen);
 
         RC generateInternalNode(Node *&res, char *data, short &offset, short &slotCount);
 
