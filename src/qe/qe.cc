@@ -491,22 +491,6 @@ namespace PeterDB {
         return 0;
     }
 
-    GHJoin::GHJoin(Iterator *leftIn, Iterator *rightIn, const Condition &condition, const unsigned int numPartitions) {
-
-    }
-
-    GHJoin::~GHJoin() {
-
-    }
-
-    RC GHJoin::getNextTuple(void *data) {
-        return -1;
-    }
-
-    RC GHJoin::getAttributes(std::vector<Attribute> &attrs) const {
-        return -1;
-    }
-
     Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, AggregateOp op) {
         this->input = input;
         this->aggAttr = aggAttr;
@@ -621,8 +605,9 @@ namespace PeterDB {
                 int keyLength = 0;
                 if (groupResultIter->first.type == TypeInt) keyLength = sizeof(int);
                 else if (groupResultIter->first.type == TypeReal) keyLength = sizeof(float);
-                else if (groupResultIter->first.type == TypeVarChar) keyLength = sizeof(int) +
-                                                                                 *(int *) groupResultIter->first.data;
+                else if (groupResultIter->first.type == TypeVarChar)
+                    keyLength = sizeof(int) +
+                                *(int *) groupResultIter->first.data;
                 memcpy((char *) data + 1, groupResultIter->first.data, keyLength);
                 float count = groupResultIter->second.count;
                 if (op == AVG) {
@@ -664,6 +649,249 @@ namespace PeterDB {
             attr.length = sizeof(float);
             attrs.push_back(attr);
         }
+        return 0;
+    }
+
+    std::string getTableName(std::string s) {
+        for (int i = 0; i < s.size(); i++) {
+            if (s[i] == '.') return s.substr(0, i);
+        }
+    }
+
+    GHJoin::GHJoin(Iterator *leftIn, Iterator *rightIn, const Condition &condition, const unsigned int numPartitions) {
+        this->leftIn = leftIn;
+        this->rightIn = rightIn;
+        this->condition = condition;
+        this->numPartitions = numPartitions;
+        this->leftIn->getAttributes(this->leftAttrs);
+        this->rightIn->getAttributes(this->rightAttrs);
+        this->leftTableName = getTableName(leftAttrs[0].name);
+        this->rightTableName = getTableName(rightAttrs[0].name);
+        for (int i = 0; i < leftAttrs.size(); i++) leftAttrNames.push_back(leftAttrs[i].name);
+        for (int i = 0; i < rightAttrs.size(); i++) rightAttrNames.push_back(rightAttrs[i].name);
+        int rightAttrIndex = getAttrIndex(rightAttrs, condition.rhsAttr);
+        this->attrType = rightAttrs[rightAttrIndex].type;
+        //partition
+        for (int i = 0; i < numPartitions; i++) {
+            std::string leftPartition =
+                    "left_join" + std::to_string(globalId) + "_" + leftTableName + std::to_string(i);
+            std::string rightPartition =
+                    "right_join" + std::to_string(globalId) + "_" + rightTableName + std::to_string(i);
+            RelationManager::instance().createTable(leftPartition, leftAttrs);
+            RelationManager::instance().createTable(rightPartition, rightAttrs);
+        }
+        insertIntoPartition("left");
+        insertIntoPartition("right");
+        //build hashmap for out loop
+        createLeftMap(0);
+        //scan a right tuple
+        RelationManager::instance().scan("right_join" + std::to_string(globalId) + "_" + rightTableName + "0", "",
+                                         NO_OP, NULL, rightAttrNames, rmScanIterator);
+        innerBuffer = malloc(PAGE_SIZE);
+        rmScanIterator.getNextTuple(rid, innerBuffer);
+    }
+
+    GHJoin::~GHJoin() {
+        for (auto &i : map) {
+            for (auto &j : i.second)
+                free(j.data);
+        }
+        map.clear();
+        for (int i = 0; i < numPartitions; i++) {
+            std::string leftPartition =
+                    "left_join" + std::to_string(globalId) + "_" + leftTableName + std::to_string(i);
+            std::string rightPartition =
+                    "right_join" + std::to_string(globalId) + "_" + rightTableName + std::to_string(i);
+            RelationManager::instance().deleteTable(leftPartition);
+            RelationManager::instance().deleteTable(rightPartition);
+        }
+    }
+
+    RC GHJoin::getNextTuple(void *data) {
+        int rightAttrIndex = getAttrIndex(rightAttrs, condition.rhsAttr);
+        while (true) {
+            Value val = getAttrValue(innerBuffer, rightAttrIndex, rightAttrs);
+            int len = getDataLength(innerBuffer, rightAttrs);
+            Tuple tuple(innerBuffer, len);
+            if (map.find(val) != map.end()) {
+                if (mapVectorIndex < map[val].size()) {
+                    joinLeftAndRight(data, map[val][mapVectorIndex].data, map[val][mapVectorIndex].length, innerBuffer,
+                                     len);
+                    mapVectorIndex++;
+                    return 0;
+                } else {//since the vector has been traversed, move to the next right tuple
+                    free(innerBuffer);
+                    innerBuffer = malloc(PAGE_SIZE);
+                    mapVectorIndex = 0;
+                    if (rmScanIterator.getNextTuple(rid, innerBuffer) != RM_EOF);
+                    else {//this right partition has been used, move to the next right partition
+                        rmScanIterator.close();
+                        rightPartition++;
+                        //if all right partitions have been used, create a new left map
+                        if (rightPartition >= numPartitions) {
+                            rightPartition = 0;
+                            //free left map
+                            for (auto &i : map) {
+                                for (auto &j : i.second)
+                                    free(j.data);
+                            }
+                            map.clear();
+                            leftPartition++;
+                            if (leftPartition >= numPartitions) {
+                                free(innerBuffer);
+                                return QE_EOF;
+                            } else {
+                                createLeftMap(leftPartition);
+                                RelationManager::instance().scan(
+                                        "right_join" + std::to_string(globalId) + "_" + rightTableName +
+                                        std::to_string(rightPartition), "", NO_OP, NULL, rightAttrNames,
+                                        rmScanIterator);
+                                rmScanIterator.getNextTuple(rid, innerBuffer);
+                            }
+                        } else {//right partitions not used up, move to next right partition
+                            RelationManager::instance().scan(
+                                    "right_join" + std::to_string(globalId) + "_" + rightTableName +
+                                    std::to_string(rightPartition), "", NO_OP, NULL, rightAttrNames, rmScanIterator);
+                            rmScanIterator.getNextTuple(rid, innerBuffer);
+                        }
+                    }
+                }
+            } else {//didn't find key in map, move to the next tuple, the following is copied from above
+                free(innerBuffer);
+                innerBuffer = malloc(PAGE_SIZE);
+                mapVectorIndex = 0;
+                if (rmScanIterator.getNextTuple(rid, innerBuffer) != RM_EOF);
+                else {//this right partition has been used, move to the next right partition
+                    rmScanIterator.close();
+                    rightPartition++;
+                    //if all right partitions have been used, create a new left map
+                    if (rightPartition >= numPartitions) {
+                        rightPartition = 0;
+                        //free left map
+                        for (auto &i : map) {
+                            for (auto &j : i.second)
+                                free(j.data);
+                        }
+                        map.clear();
+                        leftPartition++;
+                        if (leftPartition >= numPartitions) {
+                            free(innerBuffer);
+                            return QE_EOF;
+                        } else {
+                            createLeftMap(leftPartition);
+                            RelationManager::instance().scan(
+                                    "right_join" + std::to_string(globalId) + "_" + rightTableName +
+                                    std::to_string(rightPartition), "", NO_OP, NULL, rightAttrNames, rmScanIterator);
+                            rmScanIterator.getNextTuple(rid, innerBuffer);
+                        }
+                    } else {//right partitions not used up, move to next right partition
+                        RelationManager::instance().scan(
+                                "right_join" + std::to_string(globalId) + "_" + rightTableName +
+                                std::to_string(rightPartition), "", NO_OP, NULL, rightAttrNames, rmScanIterator);
+                        rmScanIterator.getNextTuple(rid, innerBuffer);
+                    }
+                }
+            }
+        }
+    }
+
+    RC GHJoin::getAttributes(std::vector<Attribute> &attrs) const {
+        attrs = this->leftAttrs;
+        attrs.insert(attrs.end(), this->rightAttrs.begin(), this->rightAttrs.end());
+        return 0;
+    }
+
+    void GHJoin::insertIntoPartition(std::string s) {
+        std::string tableName;
+        std::vector<Attribute> attrs;
+        Iterator *iterator;
+        int attrIndex;
+        if (s == "left") {
+            tableName = leftTableName;
+            attrs = leftAttrs;
+            iterator = leftIn;
+            attrIndex = getAttrIndex(attrs, condition.lhsAttr);
+        } else if (s == "right") {
+            tableName = rightTableName;
+            attrs = rightAttrs;
+            iterator = rightIn;
+            attrIndex = getAttrIndex(attrs, condition.rhsAttr);
+        }
+        void *data = malloc(PAGE_SIZE);
+        while (iterator->getNextTuple(data) != QE_EOF) {
+            Value val = getAttrValue(data, attrIndex, attrs);
+            if (attrType == TypeInt) {
+                int partitionIndex = *(int *) val.data % numPartitions;
+                RelationManager::instance().insertTuple(
+                        s + "_join" + std::to_string(globalId) + "_" + tableName + std::to_string(partitionIndex), data,
+                        rid);
+            } else if (attrType == TypeReal) {
+                int partitionIndex = (int) *(float *) val.data % numPartitions;
+                RelationManager::instance().insertTuple(
+                        s + "_join" + std::to_string(globalId) + "_" + tableName + std::to_string(partitionIndex), data,
+                        rid);
+            } else {
+                int strLen = *(int *) val.data;
+                char *charArr = (char *) malloc(strLen + 1);
+                memcpy(charArr, (char *) val.data + 1, strLen);
+                charArr[strLen] = '\0';
+                std::string tmp = charArr;
+                free(charArr);
+                int partitionIndex = std::hash<std::string>{}(tmp) % numPartitions;
+                RelationManager::instance().insertTuple(
+                        s + "_join" + std::to_string(globalId) + "_" + tableName + std::to_string(partitionIndex), data,
+                        rid);
+            }
+        }
+        free(data);
+    }
+
+    void GHJoin::createLeftMap(int leftPartition) {
+        RelationManager::instance().scan(
+                "left_join" + std::to_string(globalId) + "_" + leftTableName + std::to_string(leftPartition), "", NO_OP,
+                NULL, leftAttrNames, rmScanIterator);
+        void *data = malloc(PAGE_SIZE);
+        int attrIndex = getAttrIndex(leftAttrs, condition.lhsAttr);
+        while (rmScanIterator.getNextTuple(rid, data) != -1) {
+            Value val = getAttrValue(data, attrIndex, leftAttrs);
+            int len = getDataLength(data, leftAttrs);
+            Tuple tuple(data, len);
+            if (map.find(val) != map.end()) {
+                map[val].push_back(tuple);
+            } else {
+                std::vector<Tuple> tupleVector;
+                tupleVector.push_back(tuple);
+                map[val] = tupleVector;
+            }
+        }
+        free(data);
+        rmScanIterator.close();
+    }
+
+    RC GHJoin::joinLeftAndRight(void *data, void *outData, int outLen, void *innerData, int innerLen) {
+        int offset = 0, offset2 = 0;
+        int outSize = leftAttrs.size(), innerSize = rightAttrs.size();
+        int nullIndicatorSize1 = ceil((double) outSize / 8.0), nullIndicatorSize2 = ceil((double) innerSize / 8.0);
+        char *nullIndicator1 = (char *) malloc(nullIndicatorSize1);
+        memcpy(nullIndicator1, (char *) outData + offset, nullIndicatorSize1);
+        char *nullIndicator2 = (char *) malloc(nullIndicatorSize2);
+        memcpy(nullIndicator2, (char *) innerData + offset, nullIndicatorSize2);
+
+        int resNullIndicatorSize = ceil((double) (outSize + innerSize) / 8);
+        int resOffset = resNullIndicatorSize;
+        memcpy((char *) data, nullIndicator1, nullIndicatorSize1);
+        for (int i = outSize; i < outSize + innerSize; i++) {
+            if (!(nullIndicator2[(i - outSize) / 8] & (1 << (7 - (i - outSize) % 8)))) {
+                ((char *) data)[i / 8] = ((char *) data)[i / 8] & (0 << (7 - (i - nullIndicatorSize1) % 8));
+            } else {
+                ((char *) data)[i / 8] = ((char *) data)[i / 8] | (1 << (7 - (i - nullIndicatorSize1) % 8));
+            }
+        }
+        memcpy((char *) data + resOffset, (char *) outData + nullIndicatorSize1, outLen - nullIndicatorSize1);
+        resOffset += outLen - nullIndicatorSize1;
+        memcpy((char *) data + resOffset, (char *) innerData + nullIndicatorSize2, innerLen - nullIndicatorSize2);
+        free(nullIndicator1);
+        free(nullIndicator2);
         return 0;
     }
 } // namespace PeterDB

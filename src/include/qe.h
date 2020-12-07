@@ -291,6 +291,33 @@ namespace PeterDB {
 
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
+
+        Iterator *leftIn;
+        Iterator *rightIn;
+        Condition condition;
+        AttrType attrType;
+        unsigned numPartitions;
+        std::vector<Attribute> leftAttrs;
+        std::vector<Attribute> rightAttrs;
+        RM_ScanIterator rmScanIterator;
+        std::string leftTableName;
+        std::string rightTableName;
+        std::vector<std::string> leftAttrNames;
+        std::vector<std::string> rightAttrNames;
+        int mapVectorIndex = 0;
+        int leftPartition = 0;
+        int rightPartition = 0;
+        std::map<Value, std::vector<Tuple>> map;
+        std::map<Value, std::vector<Tuple>>::iterator mapIterator;
+        int globalId = 0;
+        RID rid;
+        void *innerBuffer;
+
+        void insertIntoPartition(std::string s);
+
+        void createLeftMap(int leftPartition);
+
+        RC joinLeftAndRight(void *data, void *outData, int outLen, void *innerData, int innerLen);
     };
 
     class AggregateByGroupResult {

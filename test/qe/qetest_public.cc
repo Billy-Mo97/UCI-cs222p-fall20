@@ -39,7 +39,7 @@ namespace PeterDBTesting {
         attr.name = "C";
         attr.type = PeterDB::TypeReal;
         attr.length = 4;
-        ix.openFile("leftC.idx",ixFileHandle);
+        ix.openFile("leftC.idx", ixFileHandle);
         ix.printBTree(ixFileHandle, attr, std::cout);
         ix.closeFile(ixFileHandle);
         destroyFile = false; // prevent from double deletion
@@ -668,10 +668,10 @@ namespace PeterDBTesting {
         unsigned numPartitions = 7;
 
         std::string leftTableName = "left";
-        createAndPopulateTable(leftTableName, {}, 10000);
+        createAndPopulateTable(leftTableName, {}, 100);//original:10000
 
         std::string rightTableName = "right";
-        createAndPopulateTable(rightTableName, {}, 10000);
+        createAndPopulateTable(rightTableName, {}, 100);
 
         // Prepare the iterator and condition
         PeterDB::TableScan leftIn(rm, "left");
@@ -697,11 +697,11 @@ namespace PeterDBTesting {
         }
 
         std::vector<std::string> expected;
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 100; i++) {
             unsigned a = i % 203;
             unsigned b1 = (i + 10) % 197;
             float c1 = (float) (i % 167) + 50.5f;
-            for (int j = 0; j < 10000; j++) {
+            for (int j = 0; j < 100; j++) {
                 unsigned b2 = j % 251 + 20;
                 float c2 = (float) (j % 261) + 25.5f;
                 unsigned d = j % 179;
@@ -721,7 +721,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(expected.size(), printed.size()) << "The number of returned tuple is not correct.";
 
         for (int i = 0; i < expected.size(); ++i) {
-            checkPrintRecord(expected[i], printed[i], false, {}, i % 50000 == 0);
+            checkPrintRecord(expected[i], printed[i], false, {}, i % 15 == 0);//50000
         }
 
         delete ghJoin;
