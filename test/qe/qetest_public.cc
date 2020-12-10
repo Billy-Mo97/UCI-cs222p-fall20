@@ -1,7 +1,7 @@
 #include "test/utils/qe_test_util.h"
 
 namespace PeterDBTesting {
-    /*TEST_F(QE_Test, create_and_delete_table_with_index) {
+    TEST_F(QE_Test, create_and_delete_table_with_index) {
         // Tables created: left
         // Indexes created: left.B, left.C
         // 1. Create an Index
@@ -23,25 +23,11 @@ namespace PeterDBTesting {
 
         // Insert tuples.
         populateTable(tableName, 100);
-        PeterDB::Attribute attr;
-        attr.name = "B";
-        attr.type = PeterDB::TypeInt;
-        attr.length = 4;
-        PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
-        PeterDB::IX_ScanIterator ix_ScanIterator;
-        PeterDB::IXFileHandle ixFileHandle;
-        //ix.openFile("leftB.idx",ixFileHandle);
-        //ix.printBTree(ixFileHandle, attr, std::cout);
-        //ix.closeFile(ixFileHandle);
+
         // Create an index after inserting tuples - should reflect the currently existing tuples.
         ASSERT_EQ(rm.createIndex(tableName, "C"), success) << "RelationManager.createIndex() should succeed.";
         ASSERT_EQ(glob(".idx").size(), 2) << "There should be two index files now.";
-        attr.name = "C";
-        attr.type = PeterDB::TypeReal;
-        attr.length = 4;
-        ix.openFile("leftC.idx", ixFileHandle);
-        ix.printBTree(ixFileHandle, attr, std::cout);
-        ix.closeFile(ixFileHandle);
+
         destroyFile = false; // prevent from double deletion
 
         // Destroy the file
@@ -242,7 +228,6 @@ namespace PeterDBTesting {
         // Go over the data through iterator
         std::vector<std::string> printed;
         ASSERT_EQ(project.getAttributes(attrs), success) << "Project.getAttributes() should succeed.";
-        int attrsSize = attrs.size();
         while (project.getNextTuple(outBuffer) != QE_EOF) {
             // Null indicators should be placed in the beginning.
             std::stringstream stream;
@@ -330,7 +315,7 @@ namespace PeterDBTesting {
         for (int i = 0; i < expected.size(); ++i) {
             checkPrintRecord(expected[i], printed[i]);
         }
-        std::cout << "bnl finshed\n";
+
     }
 
     TEST_F(QE_Test, bnljoin_with_filter) {
@@ -532,7 +517,7 @@ namespace PeterDBTesting {
             checkPrintRecord(expected[i], printed[i], false, {}, i % 10 == 0);
         }
 
-    }*/
+    }
 
     TEST_F(QE_Test, table_scan_with_max_aggregation) {
         // 1. Basic aggregation - max
@@ -542,7 +527,7 @@ namespace PeterDBTesting {
         outBuffer = malloc(bufSize);
 
         std::string tableName = "left";
-        createAndPopulateTable(tableName, {"B", "C"}, 3000);//original:3000
+        createAndPopulateTable(tableName, {"B", "C"}, 3000);
 
         // Create TableScan
         PeterDB::TableScan ts(rm, tableName);
@@ -560,7 +545,7 @@ namespace PeterDBTesting {
 
     }
 
-    /*TEST_F(QE_Test, index_scan_with_avg_aggregation) {
+    TEST_F(QE_Test, index_scan_with_avg_aggregation) {
         // 1. Basic aggregation - AVG
         // SELECT AVG(right.B) from left
 
@@ -584,7 +569,7 @@ namespace PeterDBTesting {
         checkPrintRecord("AVG(right.B): 144.522", stream.str());
         ASSERT_EQ(agg.getNextTuple(outBuffer), QE_EOF) << "Only 1 tuple should be returned for AVG.";
 
-    }*/
+    }
 
     TEST_F(QE_Test, ghjoin_on_int) {
         // Extra credit
@@ -597,10 +582,10 @@ namespace PeterDBTesting {
         unsigned numPartitions = 10;
 
         std::string leftTableName = "left";
-        createAndPopulateTable(leftTableName, {}, 100);
+        createAndPopulateTable(leftTableName, {}, 10000);
 
         std::string rightTableName = "right";
-        createAndPopulateTable(rightTableName, {}, 100);
+        createAndPopulateTable(rightTableName, {}, 10000);
 
         // Prepare the iterator and condition
         PeterDB::TableScan leftIn(rm, "left");
@@ -627,11 +612,11 @@ namespace PeterDBTesting {
         }
 
         std::vector<std::string> expected;
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10000; i++) {
             unsigned a = i % 203;
             unsigned b1 = (i + 10) % 197;
             float c1 = (float) (i % 167) + 50.5f;
-            for (int j = 0; j < 100; j++) {
+            for (int j = 0; j < 10000; j++) {
                 unsigned b2 = j % 251 + 20;
                 float c2 = (float) (j % 261) + 25.5f;
                 unsigned d = j % 179;
@@ -651,14 +636,14 @@ namespace PeterDBTesting {
         ASSERT_EQ(expected.size(), printed.size()) << "The number of returned tuple is not correct.";
 
         for (int i = 0; i < expected.size(); ++i) {
-            checkPrintRecord(expected[i], printed[i], false, {}, i % 15 == 0);
+            checkPrintRecord(expected[i], printed[i], false, {}, i % 50000 == 0);
         }
 
         delete ghJoin;
         ASSERT_EQ(glob("").size(), numFiles) << "GHJoin should clean after itself.";
     }
 //13
-    /*TEST_F(QE_Test, ghjoin_on_real) {
+    TEST_F(QE_Test, ghjoin_on_real) {
         // Extra credit
         // 1. GHJoin -- on TypeReal Attribute
         // SELECT * from left, right WHERE left.C = right.C
@@ -669,10 +654,10 @@ namespace PeterDBTesting {
         unsigned numPartitions = 7;
 
         std::string leftTableName = "left";
-        createAndPopulateTable(leftTableName, {}, 100);//original:10000
+        createAndPopulateTable(leftTableName, {}, 10000);
 
         std::string rightTableName = "right";
-        createAndPopulateTable(rightTableName, {}, 100);
+        createAndPopulateTable(rightTableName, {}, 10000);
 
         // Prepare the iterator and condition
         PeterDB::TableScan leftIn(rm, "left");
@@ -698,11 +683,11 @@ namespace PeterDBTesting {
         }
 
         std::vector<std::string> expected;
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10000; i++) {
             unsigned a = i % 203;
             unsigned b1 = (i + 10) % 197;
             float c1 = (float) (i % 167) + 50.5f;
-            for (int j = 0; j < 100; j++) {
+            for (int j = 0; j < 10000; j++) {
                 unsigned b2 = j % 251 + 20;
                 float c2 = (float) (j % 261) + 25.5f;
                 unsigned d = j % 179;
@@ -722,12 +707,12 @@ namespace PeterDBTesting {
         ASSERT_EQ(expected.size(), printed.size()) << "The number of returned tuple is not correct.";
 
         for (int i = 0; i < expected.size(); ++i) {
-            checkPrintRecord(expected[i], printed[i], false, {}, i % 15 == 0);//50000
+            checkPrintRecord(expected[i], printed[i], false, {}, i % 50000 == 0);
         }
 
         delete ghJoin;
         ASSERT_EQ(glob("").size(), numFiles) << "GHJoin should clean after itself.";
-    }*/
+    }
 
     TEST_F(QE_Test, table_scan_with_group_min_aggregation) {
         // Extra credit
@@ -738,7 +723,7 @@ namespace PeterDBTesting {
         outBuffer = malloc(bufSize);
 
         std::string tableName = "group";
-        createAndPopulateTable(tableName, {}, 100);//original 10000
+        createAndPopulateTable(tableName, {}, 10000);
 
         // Create TableScan
         PeterDB::TableScan ts(rm, tableName);

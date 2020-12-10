@@ -24,11 +24,8 @@ namespace PeterDB {
     typedef struct Value {
         AttrType type;          // type of value
         void *data;             // value
-        int intVal;
         bool operator<(const Value &right) const;
         bool operator==(const Value &right) const;
-
-        virtual ~Value();
     } Value;
 
     typedef struct Condition {

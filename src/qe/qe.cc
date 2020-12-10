@@ -340,7 +340,6 @@ namespace PeterDB {
         if (res.type == TypeInt) {
             res.data = malloc(sizeof(int));
             memcpy(res.data, (char *) data + offset, sizeof(int));
-            res.intVal = *(int*) res.data;
         } else if (res.type == TypeReal) {
             res.data = malloc(sizeof(float));
             memcpy(res.data, (char *) data + offset, sizeof(float));
@@ -688,9 +687,6 @@ namespace PeterDB {
         return (this->type == right.type) && compareKey(type, this->data, right.data) == 0;
     }
 
-    Value::~Value() {
-        free(data);
-    }
 
     Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, const Attribute &groupAttr, AggregateOp op) {
         this->input = input;
@@ -899,11 +895,6 @@ namespace PeterDB {
         int rightAttrIndex = getAttrIndex(rightAttrs, condition.rhsAttr);
         while (true) {
             Value val = getAttrValue(innerBuffer, rightAttrIndex, rightAttrs);
-            if (val.type == TypeInt) {
-                int intVal = *(int *) val.data;
-                int b = 0;
-                std::cout << intVal << std::endl;
-            }
             int len = getDataLength(innerBuffer, rightAttrs);
             Tuple tuple(innerBuffer, len);
             if (map.find(val) != map.end()) {
@@ -1048,10 +1039,6 @@ namespace PeterDB {
         int attrIndex = getAttrIndex(leftAttrs, condition.lhsAttr);
         while (rmScanIterator.getNextTuple(rid, data) != -1) {
             Value val = getAttrValue(data, attrIndex, leftAttrs);
-            if (val.type == TypeInt) {
-                int intVal = *(int *) val.data;
-                std::cout << intVal << std::endl;
-            }
             int len = getDataLength(data, leftAttrs);
             Tuple tuple(data, len);
             if (map.find(val) != map.end()) {
