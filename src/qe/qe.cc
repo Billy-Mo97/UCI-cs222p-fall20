@@ -1,4 +1,5 @@
 #include "src/include/qe.h"
+#include <iostream>
 
 namespace PeterDB {
     Filter::Filter(Iterator *input, const Condition &condition) {
@@ -334,8 +335,21 @@ namespace PeterDB {
             }
         }
         Value res;
-        res.data = (char *) data + offset;
         res.type = attrs[index].type;
+        //res.data = (char *) data + offset;
+        if (res.type == TypeInt) {
+            res.data = malloc(sizeof(int));
+            memcpy(&res.data, (char *) data + offset, sizeof(int));
+            res.intVal = *(int*) res.data;
+        } else if (res.type == TypeReal) {
+            res.data = malloc(sizeof(float));
+            memcpy(&res.data, (char *) data + offset, sizeof(float ));
+        } else if (res.type == TypeVarChar) {
+            int strLen;
+            memcpy(&strLen, (char *) data + offset, sizeof(int));
+            res.data = malloc(sizeof(int) + strLen);
+            memcpy(&res.data, (char *) data + offset, sizeof(int) + strLen);
+        }
         return res;
     }
 
@@ -650,8 +664,32 @@ namespace PeterDB {
         this->groupby = false;
     }
 
+
+
     bool Value::operator<(const Value &right) const {
+        int leftVal, rightVal;
+        if (type == TypeInt) {
+            leftVal = *(int *) this->data;
+        }
+        if (right.type == TypeInt) {
+            rightVal = *(int *) right.data;
+        }
         return (this->type == right.type) && compareKey(type, this->data, right.data) < 0;
+    }
+
+    bool Value::operator==(const Value &right) const {
+        int leftVal, rightVal;
+        if (type == TypeInt) {
+            leftVal = *(int *) this->data;
+        }
+        if (right.type == TypeInt) {
+            rightVal = *(int *) right.data;
+        }
+        return (this->type == right.type) && compareKey(type, this->data, right.data) == 0;
+    }
+
+    Value::~Value() {
+        free(data);
     }
 
     Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, const Attribute &groupAttr, AggregateOp op) {
@@ -788,7 +826,8 @@ namespace PeterDB {
         Attribute attr = this->aggAttr;
         std::string dic[] = {"MIN", "MAX", "COUNT", "SUM", "AVG"};
         if (groupby) {
-            attr.name = groupAttr.name + " " + dic[op] + "(" + aggAttr.name + ")";
+            attrs.push_back(groupAttr);
+            attr.name = dic[op] + "(" + aggAttr.name + ")";
             attr.type = TypeReal;
             attr.length = sizeof(float);
             attrs.push_back(attr);
@@ -860,6 +899,11 @@ namespace PeterDB {
         int rightAttrIndex = getAttrIndex(rightAttrs, condition.rhsAttr);
         while (true) {
             Value val = getAttrValue(innerBuffer, rightAttrIndex, rightAttrs);
+            if (val.type == TypeInt) {
+                int intVal = *(int *) val.data;
+                int b = 0;
+                std::cout << intVal << std::endl;
+            }
             int len = getDataLength(innerBuffer, rightAttrs);
             Tuple tuple(innerBuffer, len);
             if (map.find(val) != map.end()) {
@@ -966,6 +1010,7 @@ namespace PeterDB {
             iterator = rightIn;
             attrIndex = getAttrIndex(attrs, condition.rhsAttr);
         }
+
         void *data = malloc(PAGE_SIZE);
         while (iterator->getNextTuple(data) != QE_EOF) {
             Value val = getAttrValue(data, attrIndex, attrs);
@@ -1003,6 +1048,10 @@ namespace PeterDB {
         int attrIndex = getAttrIndex(leftAttrs, condition.lhsAttr);
         while (rmScanIterator.getNextTuple(rid, data) != -1) {
             Value val = getAttrValue(data, attrIndex, leftAttrs);
+            if (val.type == TypeInt) {
+                int intVal = *(int *) val.data;
+                std::cout << intVal << std::endl;
+            }
             int len = getDataLength(data, leftAttrs);
             Tuple tuple(data, len);
             if (map.find(val) != map.end()) {
@@ -1010,7 +1059,7 @@ namespace PeterDB {
             } else {
                 std::vector<Tuple> tupleVector;
                 tupleVector.push_back(tuple);
-                map[val] = tupleVector;
+                map.insert(std::make_pair(val, tupleVector));
             }
         }
         free(data);
