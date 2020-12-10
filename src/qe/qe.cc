@@ -158,7 +158,8 @@ namespace PeterDB {
 
     }
 
-    RC Project::getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap) {
+    RC Project::getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output,
+                               std::map<int, int> &attrMap) {
         std::vector<Attribute> attributes;
         if (getAttributes(attributes) == -1) { return -1; }
         int dataNullIndicatorSize = ceil(allAttributes.size() / 8.0);
@@ -177,7 +178,9 @@ namespace PeterDB {
         return 0;
     }
 
-    RC Project::getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value, int &dataLen) {
+    RC
+    Project::getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value,
+                               int &dataLen) {
         int dataNullIndicatorSize = ceil(allAttributes.size() / 8.0);
         char *dataNullIndicator = (char *) malloc(dataNullIndicatorSize);
         memset(dataNullIndicator, 0, dataNullIndicatorSize);
@@ -185,11 +188,11 @@ namespace PeterDB {
 
         int nullIndicatorSize = ceil(output.size() / 8.0);
         char *nullIndicator = (char *) malloc(nullIndicatorSize);
-        memset(nullIndicator,0,nullIndicatorSize);
+        memset(nullIndicator, 0, nullIndicatorSize);
         char nullField = 0;
         for (int p = 0; p < output.size(); p++) {
             int nullBit = dataNullIndicator[output[p] / 8] & (1 << (8 - 1 - output[p] % 8));
-            if (nullBit != 0 ) {
+            if (nullBit != 0) {
                 int rightMost = 8 - (p % 8 + 1);
                 nullField += 1 << rightMost;
             }
@@ -219,7 +222,7 @@ namespace PeterDB {
                     offset += sizeof(int);
                 } else if (type == TypeReal) {
                     float val;
-                    memcpy(&val,  (char *) data + dataOffset, sizeof(float));
+                    memcpy(&val, (char *) data + dataOffset, sizeof(float));
                     memcpy((char *) value + offset, (char *) data + start, sizeof(float));
                     offset += sizeof(float);
                 } else if (type == TypeVarChar) {
@@ -339,16 +342,16 @@ namespace PeterDB {
         //res.data = (char *) data + offset;
         if (res.type == TypeInt) {
             res.data = malloc(sizeof(int));
-            memcpy(&res.data, (char *) data + offset, sizeof(int));
-            res.intVal = *(int*) res.data;
+            memcpy(res.data, (char *) data + offset, sizeof(int));
+            res.intVal = *(int *) res.data;
         } else if (res.type == TypeReal) {
             res.data = malloc(sizeof(float));
-            memcpy(&res.data, (char *) data + offset, sizeof(float ));
+            memcpy(res.data, (char *) data + offset, sizeof(float));
         } else if (res.type == TypeVarChar) {
             int strLen;
             memcpy(&strLen, (char *) data + offset, sizeof(int));
             res.data = malloc(sizeof(int) + strLen);
-            memcpy(&res.data, (char *) data + offset, sizeof(int) + strLen);
+            memcpy(res.data, (char *) data + offset, sizeof(int) + strLen);
         }
         return res;
     }
@@ -665,7 +668,6 @@ namespace PeterDB {
     }
 
 
-
     bool Value::operator<(const Value &right) const {
         int leftVal, rightVal;
         if (type == TypeInt) {
@@ -686,10 +688,6 @@ namespace PeterDB {
             rightVal = *(int *) right.data;
         }
         return (this->type == right.type) && compareKey(type, this->data, right.data) == 0;
-    }
-
-    Value::~Value() {
-        free(data);
     }
 
     Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, const Attribute &groupAttr, AggregateOp op) {

@@ -28,7 +28,7 @@ namespace PeterDB {
         bool operator<(const Value &right) const;
         bool operator==(const Value &right) const;
 
-        virtual ~Value();
+//        virtual ~Value();
     } Value;
 
     typedef struct Condition {

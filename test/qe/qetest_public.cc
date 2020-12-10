@@ -560,7 +560,7 @@ namespace PeterDBTesting {
 
     }
 
-    /*TEST_F(QE_Test, index_scan_with_avg_aggregation) {
+    TEST_F(QE_Test, index_scan_with_avg_aggregation) {
         // 1. Basic aggregation - AVG
         // SELECT AVG(right.B) from left
 
@@ -584,7 +584,7 @@ namespace PeterDBTesting {
         checkPrintRecord("AVG(right.B): 144.522", stream.str());
         ASSERT_EQ(agg.getNextTuple(outBuffer), QE_EOF) << "Only 1 tuple should be returned for AVG.";
 
-    }*/
+    }
 
     TEST_F(QE_Test, ghjoin_on_int) {
         // Extra credit
