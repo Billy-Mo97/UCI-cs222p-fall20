@@ -697,7 +697,7 @@ namespace PeterDB {
         if (rbfm.insertRecord(fileHandle, recordDescriptor, data, rid) == -1) { return -1; }
         if (rbfm.closeFile(fileHandle) == -1) { return -1; }
         //insert indexes
-        int offset = ceil((double) recordDescriptor.size() / CHAR_BIT);
+        int offset = ceil((double) recordDescriptor.size() / 8.0);
         for (Attribute a:recordDescriptor) {
             if (hasIndex(tableName, a.name) == 1) {
                 PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
