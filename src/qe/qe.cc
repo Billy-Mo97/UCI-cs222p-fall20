@@ -750,7 +750,7 @@ namespace PeterDB {
         ((char *) data)[0] = 0;
         if (!this->groupby) {
             char *temp = (char *) malloc(PAGE_SIZE);
-            float sum = 0, min = std::numeric_limits<float>::max(), max = std::numeric_limits<float>::min();
+            float sum = 0, min = INT_MAX, max = INT_MIN;
             int count = 0;
             while (this->input->getNextTuple(temp) != QE_EOF) {
                 Value val = getAttrValue(temp, this->attrIndex, this->attrs);
