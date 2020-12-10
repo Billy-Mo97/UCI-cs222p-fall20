@@ -4,9 +4,12 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <cmath>
+#include <limits.h>
 
 #include "rm.h"
 #include "ix.h"
+#include "map"
 
 namespace PeterDB {
 
@@ -23,6 +26,8 @@ namespace PeterDB {
     typedef struct Value {
         AttrType type;          // type of value
         void *data;             // value
+        bool operator<(const Value &right) const;
+        bool operator==(const Value &right) const;
     } Value;
 
     typedef struct Condition {
@@ -296,6 +301,50 @@ namespace PeterDB {
 
         // For attribute in std::vector<Attribute>, name it as rel.attr
         RC getAttributes(std::vector<Attribute> &attrs) const override;
+
+        Iterator *leftIn;
+        Iterator *rightIn;
+        Condition condition;
+        AttrType attrType;
+        unsigned numPartitions;
+        std::vector<Attribute> leftAttrs;
+        std::vector<Attribute> rightAttrs;
+        RM_ScanIterator rmScanIterator;
+        std::string leftTableName;
+        std::string rightTableName;
+        std::vector<std::string> leftAttrNames;
+        std::vector<std::string> rightAttrNames;
+        int mapVectorIndex = 0;
+        int leftPartition = 0;
+        int rightPartition = 0;
+        std::map<Value, std::vector<Tuple>> map;
+        std::map<Value, std::vector<Tuple>>::iterator mapIterator;
+        int globalId = 0;
+        RID rid;
+        void *innerBuffer;
+
+        void insertIntoPartition(std::string s);
+
+        void createLeftMap(int leftPartition);
+
+        RC joinLeftAndRight(void *data, void *outData, int outLen, void *innerData, int innerLen);
+    };
+
+    class AggregateByGroupResult {
+    public:
+        float sum;
+        float count;
+        float max;
+        float min;
+        float avg;
+
+        AggregateByGroupResult() {
+            sum = 0;
+            count = 0;
+            max = INT_MIN;
+            min = INT_MAX;
+            avg = 0;
+        }
     };
 
     class Aggregate : public Iterator {
@@ -317,15 +366,18 @@ namespace PeterDB {
         );
 
         ~Aggregate() override;
+
         Iterator *input;                              // Iterator of input R
         Attribute aggAttr;                            // The attribute over which we are computing an aggregate
         AggregateOp op;                               // Aggregate operation
         std::vector<Attribute> attrs;
+        Attribute groupAttr;
         int attrIndex;
         bool end;
-        //map<Value, AggregateResult> groupResult;
-        //map<Value, AggregateResult>::iterator groupResultIter;
         bool groupby;
+        std::map<Value, AggregateByGroupResult> groupResult;
+        std::map<Value, AggregateByGroupResult>::iterator groupResultIter;
+
         RC getNextTuple(void *data) override;
 
         // Please name the output attribute as aggregateOp(aggAttr)

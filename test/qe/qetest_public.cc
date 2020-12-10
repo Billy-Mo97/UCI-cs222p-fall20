@@ -23,25 +23,11 @@ namespace PeterDBTesting {
 
         // Insert tuples.
         populateTable(tableName, 100);
-        PeterDB::Attribute attr;
-        attr.name = "B";
-        attr.type = PeterDB::TypeInt;
-        attr.length = 4;
-        PeterDB::IndexManager &ix = PeterDB::IndexManager::instance();
-        PeterDB::IX_ScanIterator ix_ScanIterator;
-        PeterDB::IXFileHandle ixFileHandle;
-        //ix.openFile("leftB.idx",ixFileHandle);
-        //ix.printBTree(ixFileHandle, attr, std::cout);
-        //ix.closeFile(ixFileHandle);
+
         // Create an index after inserting tuples - should reflect the currently existing tuples.
         ASSERT_EQ(rm.createIndex(tableName, "C"), success) << "RelationManager.createIndex() should succeed.";
         ASSERT_EQ(glob(".idx").size(), 2) << "There should be two index files now.";
-        attr.name = "C";
-        attr.type = PeterDB::TypeReal;
-        attr.length = 4;
-        ix.openFile("leftC.idx",ixFileHandle);
-        ix.printBTree(ixFileHandle, attr, std::cout);
-        ix.closeFile(ixFileHandle);
+
         destroyFile = false; // prevent from double deletion
 
         // Destroy the file
@@ -242,7 +228,6 @@ namespace PeterDBTesting {
         // Go over the data through iterator
         std::vector<std::string> printed;
         ASSERT_EQ(project.getAttributes(attrs), success) << "Project.getAttributes() should succeed.";
-        int attrsSize = attrs.size();
         while (project.getNextTuple(outBuffer) != QE_EOF) {
             // Null indicators should be placed in the beginning.
             std::stringstream stream;
@@ -330,7 +315,7 @@ namespace PeterDBTesting {
         for (int i = 0; i < expected.size(); ++i) {
             checkPrintRecord(expected[i], printed[i]);
         }
-        std::cout << "bnl finshed\n";
+
     }
 
     TEST_F(QE_Test, bnljoin_with_filter) {
@@ -542,7 +527,7 @@ namespace PeterDBTesting {
         outBuffer = malloc(bufSize);
 
         std::string tableName = "left";
-        createAndPopulateTable(tableName, {"B", "C"}, 3000);//original:3000
+        createAndPopulateTable(tableName, {"B", "C"}, 3000);
 
         // Create TableScan
         PeterDB::TableScan ts(rm, tableName);
@@ -586,7 +571,7 @@ namespace PeterDBTesting {
 
     }
 
-    /*TEST_F(QE_Test, ghjoin_on_int) {
+    TEST_F(QE_Test, ghjoin_on_int) {
         // Extra credit
         // 1. GHJoin -- on TypeInt Attribute
         // SELECT * from left, right WHERE left.B = right.B
@@ -815,6 +800,6 @@ namespace PeterDBTesting {
             checkPrintRecord(expected[i], printed[i], false, {}, true);
         }
 
-    }*/
+    }
 
 } // namespace PeterDBTesting
