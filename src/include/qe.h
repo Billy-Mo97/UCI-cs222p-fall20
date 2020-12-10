@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <cmath>
+#include <limits.h>
 
 #include "rm.h"
 #include "ix.h"
@@ -339,8 +341,8 @@ namespace PeterDB {
         AggregateByGroupResult() {
             sum = 0;
             count = 0;
-            max = std::numeric_limits<float>::min();
-            min = std::numeric_limits<float>::max();
+            max = INT_MIN;
+            min = INT_MAX;
             avg = 0;
         }
     };
