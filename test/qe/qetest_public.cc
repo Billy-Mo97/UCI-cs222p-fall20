@@ -1,7 +1,7 @@
 #include "test/utils/qe_test_util.h"
 
 namespace PeterDBTesting {
-    /*TEST_F(QE_Test, create_and_delete_table_with_index) {
+    TEST_F(QE_Test, create_and_delete_table_with_index) {
         // Tables created: left
         // Indexes created: left.B, left.C
         // 1. Create an Index
@@ -517,7 +517,7 @@ namespace PeterDBTesting {
             checkPrintRecord(expected[i], printed[i], false, {}, i % 10 == 0);
         }
 
-    }*/
+    }
 
     TEST_F(QE_Test, table_scan_with_max_aggregation) {
         // 1. Basic aggregation - max
@@ -643,7 +643,7 @@ namespace PeterDBTesting {
         ASSERT_EQ(glob("").size(), numFiles) << "GHJoin should clean after itself.";
     }
 //13
-    /*TEST_F(QE_Test, ghjoin_on_real) {
+    TEST_F(QE_Test, ghjoin_on_real) {
         // Extra credit
         // 1. GHJoin -- on TypeReal Attribute
         // SELECT * from left, right WHERE left.C = right.C
@@ -712,7 +712,7 @@ namespace PeterDBTesting {
 
         delete ghJoin;
         ASSERT_EQ(glob("").size(), numFiles) << "GHJoin should clean after itself.";
-    }*/
+    }
 
     TEST_F(QE_Test, table_scan_with_group_min_aggregation) {
         // Extra credit
