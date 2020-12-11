@@ -51,7 +51,7 @@ scan all inner records and compare, repeat the process until we scan all out rec
 
 ### 6. Index Nested Loop Join
 - Describe how your index nested loop join works. 
-for each record we fectch from leftIterator, set the right iterator based on key,
+for each record we fetch from leftIterator, set the right iterator based on key,
 for each satisfying right record, join them.
 
 ### 7. Grace Hash Join (If you have implemented this feature)
