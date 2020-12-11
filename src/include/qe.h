@@ -195,7 +195,7 @@ namespace PeterDB {
                 const std::vector<std::string> &attrNames);     // std::vector containing attribute names
         ~Project() override;
 
-        RC getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap);
+        RC getFieldsStart(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap);
 
         RC getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value, int &dataLen);
 
