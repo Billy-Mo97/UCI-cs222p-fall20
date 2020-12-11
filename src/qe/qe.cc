@@ -158,16 +158,30 @@ namespace PeterDB {
 
     }
 
-    RC Project::getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap) {
+    RC Project::getFieldsStart(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap) {
         std::vector<Attribute> attributes;
         if (getAttributes(attributes) == -1) { return -1; }
         int dataNullIndicatorSize = ceil(allAttributes.size() / 8.0);
+        char *dataNullIndicator = (char *)malloc(dataNullIndicatorSize);
+        memcpy(dataNullIndicator, data, dataNullIndicatorSize);
         std::vector<int> starts;
         int start = dataNullIndicatorSize;
-        for (auto attr : allAttributes) {
+        for (int i = 0; i < allAttributes.size(); i++) {
             starts.push_back(start);
-            AttrType type = attr.type;
-            start += attr.length;
+            int nullBit = dataNullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
+            if (!nullBit) {
+                Attribute attr = allAttributes[i];
+                AttrType type = attr.type;
+                if (type == TypeInt) {
+                    start += sizeof(int);
+                } else if (type == TypeReal) {
+                    start += sizeof(float);
+                } else if (type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, (char *)data + start, sizeof(int));
+                    start += sizeof(int) + strLen;
+                }
+            }
         }
         for (int i = 0; i < attributes.size(); i++) {
             Attribute attr = attributes[i];
@@ -205,7 +219,7 @@ namespace PeterDB {
         int offset = nullIndicatorSize;
 
         std::map<int, int> attrMap;
-        if (getFieldsStart(allAttributes, output, attrMap) == -1) { return -1; }
+        if (getFieldsStart(data, allAttributes, output, attrMap) == -1) { return -1; }
         std::vector<Attribute> attributes;
         if (getAttributes(attributes) == -1) { return -1; }
         for (int i = 0; i < attributes.size(); i++) {
@@ -231,36 +245,6 @@ namespace PeterDB {
             }
         }
 
-        /*for (int i = 0; i < allAttributes.size(); i++) {
-            int nullBit = dataNullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
-            if (nullBit == 0) {
-                AttrType type = allAttributes[i].type;
-                if (type == TypeInt) {
-                    if (find(output.begin(), output.end(), i) != output.end()) {
-                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(int));
-                        offset += sizeof(int);
-                    }
-                    dataOffset += sizeof(int);
-                } else if (type == TypeReal) {
-                    if (find(output.begin(), output.end(), i) != output.end()) {
-                        float val;
-                        memcpy(&val,  (char *) data + dataOffset, sizeof(float));
-                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(float));
-                        offset += sizeof(float);
-                    }
-                    dataOffset += sizeof(float);
-                } else if (type == TypeVarChar) {
-                    int strLen;
-                    memcpy(&strLen, (char *) data + dataOffset, sizeof(int));
-                    if (find(output.begin(), output.end(), i) != output.end()) {
-                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(int) + strLen);
-                        offset += sizeof(int) + strLen;
-                    }
-                    dataOffset += sizeof(int) + strLen;
-                }
-            }
-        }*/
-
         dataLen = offset;
         free(dataNullIndicator);
         free(nullIndicator);
@@ -280,7 +264,6 @@ namespace PeterDB {
                 }
             }
         }
-
 
         void *returnedData = malloc(PAGE_SIZE);
         memset(returnedData, 0, PAGE_SIZE);

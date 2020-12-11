@@ -571,7 +571,7 @@ namespace PeterDBTesting {
 
     }
 
-    TEST_F(QE_Test, ghjoin_on_int) {
+    /*TEST_F(QE_Test, ghjoin_on_int) {
         // Extra credit
         // 1. GHJoin -- on TypeInt Attribute
         // SELECT * from left, right WHERE left.B = right.B
@@ -712,7 +712,7 @@ namespace PeterDBTesting {
 
         delete ghJoin;
         ASSERT_EQ(glob("").size(), numFiles) << "GHJoin should clean after itself.";
-    }
+    }*/
 
     TEST_F(QE_Test, table_scan_with_group_min_aggregation) {
         // Extra credit
