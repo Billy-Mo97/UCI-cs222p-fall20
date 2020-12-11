@@ -158,17 +158,30 @@ namespace PeterDB {
 
     }
 
-    RC Project::getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output,
-                               std::map<int, int> &attrMap) {
+    RC Project::getFieldsStart(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap) {
         std::vector<Attribute> attributes;
         if (getAttributes(attributes) == -1) { return -1; }
         int dataNullIndicatorSize = ceil(allAttributes.size() / 8.0);
+        char *dataNullIndicator = (char *)malloc(dataNullIndicatorSize);
+        memcpy(dataNullIndicator, data, dataNullIndicatorSize);
         std::vector<int> starts;
         int start = dataNullIndicatorSize;
-        for (auto attr : allAttributes) {
+        for (int i = 0; i < allAttributes.size(); i++) {
             starts.push_back(start);
-            AttrType type = attr.type;
-            start += attr.length;
+            int nullBit = dataNullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
+            if (!nullBit) {
+                Attribute attr = allAttributes[i];
+                AttrType type = attr.type;
+                if (type == TypeInt) {
+                    start += sizeof(int);
+                } else if (type == TypeReal) {
+                    start += sizeof(float);
+                } else if (type == TypeVarChar) {
+                    int strLen;
+                    memcpy(&strLen, (char *)data + start, sizeof(int));
+                    start += sizeof(int) + strLen;
+                }
+            }
         }
         for (int i = 0; i < attributes.size(); i++) {
             Attribute attr = attributes[i];
@@ -178,9 +191,7 @@ namespace PeterDB {
         return 0;
     }
 
-    RC
-    Project::getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value,
-                               int &dataLen) {
+    RC Project::getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value, int &dataLen) {
         int dataNullIndicatorSize = ceil(allAttributes.size() / 8.0);
         char *dataNullIndicator = (char *) malloc(dataNullIndicatorSize);
         memset(dataNullIndicator, 0, dataNullIndicatorSize);
@@ -188,11 +199,11 @@ namespace PeterDB {
 
         int nullIndicatorSize = ceil(output.size() / 8.0);
         char *nullIndicator = (char *) malloc(nullIndicatorSize);
-        memset(nullIndicator, 0, nullIndicatorSize);
+        memset(nullIndicator,0,nullIndicatorSize);
         char nullField = 0;
         for (int p = 0; p < output.size(); p++) {
             int nullBit = dataNullIndicator[output[p] / 8] & (1 << (8 - 1 - output[p] % 8));
-            if (nullBit != 0) {
+            if (nullBit != 0 ) {
                 int rightMost = 8 - (p % 8 + 1);
                 nullField += 1 << rightMost;
             }
@@ -208,7 +219,7 @@ namespace PeterDB {
         int offset = nullIndicatorSize;
 
         std::map<int, int> attrMap;
-        if (getFieldsStart(allAttributes, output, attrMap) == -1) { return -1; }
+        if (getFieldsStart(data, allAttributes, output, attrMap) == -1) { return -1; }
         std::vector<Attribute> attributes;
         if (getAttributes(attributes) == -1) { return -1; }
         for (int i = 0; i < attributes.size(); i++) {
@@ -222,7 +233,7 @@ namespace PeterDB {
                     offset += sizeof(int);
                 } else if (type == TypeReal) {
                     float val;
-                    memcpy(&val, (char *) data + dataOffset, sizeof(float));
+                    memcpy(&val,  (char *) data + dataOffset, sizeof(float));
                     memcpy((char *) value + offset, (char *) data + start, sizeof(float));
                     offset += sizeof(float);
                 } else if (type == TypeVarChar) {
@@ -233,36 +244,6 @@ namespace PeterDB {
                 }
             }
         }
-
-        /*for (int i = 0; i < allAttributes.size(); i++) {
-            int nullBit = dataNullIndicator[i / 8] & (1 << (8 - 1 - i % 8));
-            if (nullBit == 0) {
-                AttrType type = allAttributes[i].type;
-                if (type == TypeInt) {
-                    if (find(output.begin(), output.end(), i) != output.end()) {
-                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(int));
-                        offset += sizeof(int);
-                    }
-                    dataOffset += sizeof(int);
-                } else if (type == TypeReal) {
-                    if (find(output.begin(), output.end(), i) != output.end()) {
-                        float val;
-                        memcpy(&val,  (char *) data + dataOffset, sizeof(float));
-                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(float));
-                        offset += sizeof(float);
-                    }
-                    dataOffset += sizeof(float);
-                } else if (type == TypeVarChar) {
-                    int strLen;
-                    memcpy(&strLen, (char *) data + dataOffset, sizeof(int));
-                    if (find(output.begin(), output.end(), i) != output.end()) {
-                        memcpy((char *) value + offset, (char *) data + dataOffset, sizeof(int) + strLen);
-                        offset += sizeof(int) + strLen;
-                    }
-                    dataOffset += sizeof(int) + strLen;
-                }
-            }
-        }*/
 
         dataLen = offset;
         free(dataNullIndicator);
@@ -283,7 +264,6 @@ namespace PeterDB {
                 }
             }
         }
-
 
         void *returnedData = malloc(PAGE_SIZE);
         memset(returnedData, 0, PAGE_SIZE);
@@ -343,7 +323,6 @@ namespace PeterDB {
         if (res.type == TypeInt) {
             res.data = malloc(sizeof(int));
             memcpy(res.data, (char *) data + offset, sizeof(int));
-            res.intVal = *(int *) res.data;
         } else if (res.type == TypeReal) {
             res.data = malloc(sizeof(float));
             memcpy(res.data, (char *) data + offset, sizeof(float));
@@ -668,6 +647,7 @@ namespace PeterDB {
     }
 
 
+
     bool Value::operator<(const Value &right) const {
         int leftVal, rightVal;
         if (type == TypeInt) {
@@ -689,6 +669,7 @@ namespace PeterDB {
         }
         return (this->type == right.type) && compareKey(type, this->data, right.data) == 0;
     }
+
 
     Aggregate::Aggregate(Iterator *input, const Attribute &aggAttr, const Attribute &groupAttr, AggregateOp op) {
         this->input = input;
@@ -752,7 +733,7 @@ namespace PeterDB {
         ((char *) data)[0] = 0;
         if (!this->groupby) {
             char *temp = (char *) malloc(PAGE_SIZE);
-            float sum = 0, min = std::numeric_limits<float>::max(), max = std::numeric_limits<float>::min();
+            float sum = 0, min = INT_MAX, max = INT_MIN;
             int count = 0;
             while (this->input->getNextTuple(temp) != QE_EOF) {
                 Value val = getAttrValue(temp, this->attrIndex, this->attrs);
@@ -897,11 +878,6 @@ namespace PeterDB {
         int rightAttrIndex = getAttrIndex(rightAttrs, condition.rhsAttr);
         while (true) {
             Value val = getAttrValue(innerBuffer, rightAttrIndex, rightAttrs);
-            if (val.type == TypeInt) {
-                int intVal = *(int *) val.data;
-                int b = 0;
-                std::cout << intVal << std::endl;
-            }
             int len = getDataLength(innerBuffer, rightAttrs);
             Tuple tuple(innerBuffer, len);
             if (map.find(val) != map.end()) {
@@ -1046,10 +1022,6 @@ namespace PeterDB {
         int attrIndex = getAttrIndex(leftAttrs, condition.lhsAttr);
         while (rmScanIterator.getNextTuple(rid, data) != -1) {
             Value val = getAttrValue(data, attrIndex, leftAttrs);
-            if (val.type == TypeInt) {
-                int intVal = *(int *) val.data;
-                std::cout << intVal << std::endl;
-            }
             int len = getDataLength(data, leftAttrs);
             Tuple tuple(data, len);
             if (map.find(val) != map.end()) {

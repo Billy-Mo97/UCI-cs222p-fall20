@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <cmath>
+#include <limits.h>
 
 #include "rm.h"
 #include "ix.h"
@@ -24,11 +26,8 @@ namespace PeterDB {
     typedef struct Value {
         AttrType type;          // type of value
         void *data;             // value
-        int intVal;
         bool operator<(const Value &right) const;
         bool operator==(const Value &right) const;
-
-//        virtual ~Value();
     } Value;
 
     typedef struct Condition {
@@ -196,7 +195,7 @@ namespace PeterDB {
                 const std::vector<std::string> &attrNames);     // std::vector containing attribute names
         ~Project() override;
 
-        RC getFieldsStart(std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap);
+        RC getFieldsStart(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, std::map<int, int> &attrMap);
 
         RC getAttributeValue(void *data, std::vector<Attribute> allAttributes, std::vector<int> output, void *value, int &dataLen);
 
@@ -342,8 +341,8 @@ namespace PeterDB {
         AggregateByGroupResult() {
             sum = 0;
             count = 0;
-            max = std::numeric_limits<float>::min();
-            min = std::numeric_limits<float>::max();
+            max = INT_MIN;
+            min = INT_MAX;
             avg = 0;
         }
     };
