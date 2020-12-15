@@ -166,6 +166,7 @@ namespace PeterDBTesting {
         unsigned rc, wc, ac, rcAfter, wcAfter, acAfter;
         PeterDB::IX_ScanIterator ix_ScanIterator;
         bool destroyFile = true;
+        bool closeFile = true;
         std::vector<PeterDB::RID> rids;
 
     public:
@@ -180,9 +181,10 @@ namespace PeterDBTesting {
 
         void TearDown() override {
 
-            // close index file
-            ASSERT_EQ(ix.closeFile(ixFileHandle), success) << "indexManager::closeFile() should succeed.";
-
+            if (closeFile) {
+                // close index file
+                ASSERT_EQ(ix.closeFile(ixFileHandle), success) << "indexManager::closeFile() should succeed.";
+            }
             if (destroyFile) {
                 // destroy index file
                 ASSERT_EQ(ix.destroyFile(indexFileName), success) << "indexManager::destroyFile() should succeed.";
@@ -193,7 +195,7 @@ namespace PeterDBTesting {
             // close index file
             ASSERT_EQ(ix.closeFile(ixFileHandle), success) << "indexManager::closeFile() should succeed.";
 
-            ixFileHandle = PeterDB::IXFileHandle();
+//            ixFileHandle = PeterDB::IXFileHandle();
             // open index file
             ASSERT_EQ(ix.openFile(indexFileName, ixFileHandle), success) << "indexManager::openFile() should succeed.";
         }
@@ -208,8 +210,6 @@ namespace PeterDBTesting {
                 rid.slotNum = (unsigned) (value * salt * seed + seed) % SHRT_MAX;
                 rids.emplace_back(rid);
                 T key = fixedKey == NULL ? value : fixedKey;
-                //std::cout << "Inserting " << i << "th entry.\n";
-
                 ASSERT_EQ(ix.insertEntry(ixFileHandle, attr, &key, rid), success)
                                             << "indexManager::insertEntry() should succeed.";
             }
@@ -253,7 +253,7 @@ namespace PeterDBTesting {
                 EXPECT_LE(root.childrenCount(), 2 * D + 1)
                                     << "number of children should be less than or equal to 2D+1.";
                 if (!isTreeRoot && !allowUnderFit)
-                    EXPECT_GE(root.childrenCount(), D) << "number of children should be more than or equal to D.";
+                    EXPECT_GE(root.keyCount(), D) << "number of children should be more than or equal to D.";
             } else {
                 // leaf node
                 EXPECT_LE(root.keyCount(), 2 * D) << "number of entries should be less than or equal to 2D.";
@@ -281,6 +281,47 @@ namespace PeterDBTesting {
             EXPECT_NE(target, ridsForCheck.end()) << "RID is not from inserted.";
             ridsForCheck.erase(target);
             EXPECT_EQ(key, expected) << "key does not match.";
+        }
+
+    };
+
+    class IX_Private_Test : public IX_Test {
+    protected:
+        PeterDB::IXFileHandle ixFileHandle2;
+        std::string indexFileName2 = "ix_private_test_index_file";
+        PeterDB::RID rid2;
+        unsigned rc2, wc2, ac2, rcAfter2, wcAfter2, acAfter2;
+        PeterDB::IX_ScanIterator ix_ScanIterator2;
+        std::vector<PeterDB::RID> rids2;
+
+        PeterDB::Attribute shortEmpNameAttr{"short_emp_name", PeterDB::TypeVarChar, 20};
+        PeterDB::Attribute longEmpNameAttr{"long_emp_name", PeterDB::TypeVarChar, 100};
+
+    public:
+        void SetUp() override {
+            remove(indexFileName.c_str());
+            remove(indexFileName2.c_str());
+
+            // create index file
+            ASSERT_EQ(ix.createFile(indexFileName), success) << "indexManager::createFile() should success";
+            ASSERT_EQ(ix.createFile(indexFileName2), success) << "indexManager::createFile() should success";
+
+            // open index file
+            ASSERT_EQ(ix.openFile(indexFileName, ixFileHandle), success) << "indexManager::openFile() should succeed.";
+            ASSERT_EQ(ix.openFile(indexFileName2, ixFileHandle2), success) << "indexManager::openFile() should succeed.";
+        }
+
+        void TearDown() override {
+            if (closeFile) {
+                // close index file
+                ASSERT_EQ(ix.closeFile(ixFileHandle), success) << "indexManager::closeFile() should succeed.";
+                ASSERT_EQ(ix.closeFile(ixFileHandle2), success) << "indexManager::closeFile() should succeed.";
+            }
+            if (destroyFile) {
+                // destroy index file
+                ASSERT_EQ(ix.destroyFile(indexFileName), success) << "indexManager::destroyFile() should succeed.";
+                ASSERT_EQ(ix.destroyFile(indexFileName2), success) << "indexManager::destroyFile() should succeed.";
+            }
         }
 
     };
