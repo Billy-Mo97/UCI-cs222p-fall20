@@ -19,7 +19,7 @@ namespace PeterDBTesting {
 
         // Create an index before inserting tuples.
         ASSERT_EQ(rm.createIndex(tableName, "B"), success) << "RelationManager.createIndex() should succeed.";
-        ASSERT_EQ(glob(".idx").size(), 1) << "There should be one index files now.";
+        ASSERT_EQ(glob(".idx").size(), 1) << "There should be two index files now.";
 
         // Insert tuples.
         populateTable(tableName, 100);
@@ -582,10 +582,10 @@ namespace PeterDBTesting {
         unsigned numPartitions = 10;
 
         std::string leftTableName = "left";
-        createAndPopulateTable(leftTableName, {}, 100);
+        createAndPopulateTable(leftTableName, {}, 10000);
 
         std::string rightTableName = "right";
-        createAndPopulateTable(rightTableName, {}, 100);
+        createAndPopulateTable(rightTableName, {}, 10000);
 
         // Prepare the iterator and condition
         PeterDB::TableScan leftIn(rm, "left");
@@ -612,11 +612,11 @@ namespace PeterDBTesting {
         }
 
         std::vector<std::string> expected;
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10000; i++) {
             unsigned a = i % 203;
             unsigned b1 = (i + 10) % 197;
             float c1 = (float) (i % 167) + 50.5f;
-            for (int j = 0; j < 100; j++) {
+            for (int j = 0; j < 10000; j++) {
                 unsigned b2 = j % 251 + 20;
                 float c2 = (float) (j % 261) + 25.5f;
                 unsigned d = j % 179;
@@ -636,13 +636,13 @@ namespace PeterDBTesting {
         ASSERT_EQ(expected.size(), printed.size()) << "The number of returned tuple is not correct.";
 
         for (int i = 0; i < expected.size(); ++i) {
-            checkPrintRecord(expected[i], printed[i], false, {}, i % 15 == 0);
+            checkPrintRecord(expected[i], printed[i], false, {}, i % 50000 == 0);
         }
 
         delete ghJoin;
         ASSERT_EQ(glob("").size(), numFiles) << "GHJoin should clean after itself.";
     }
-//13
+
     TEST_F(QE_Test, ghjoin_on_real) {
         // Extra credit
         // 1. GHJoin -- on TypeReal Attribute
