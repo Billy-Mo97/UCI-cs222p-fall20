@@ -49,7 +49,6 @@ namespace PeterDBTesting {
         std::ifstream in2(fileName2.c_str(), std::ifstream::in | std::ifstream::binary);
         in2.seekg(0, std::ifstream::end);
         s2 = in2.tellg();
-        std::cout<<fileName1<<":"<<s1<<" "<<fileName2<<":"<<s2<<std::endl;
         return s1 == s2;
     }
 
@@ -107,11 +106,8 @@ namespace PeterDBTesting {
         std::string::size_type val_end;
 
         while ((key_end = keyValuePairsStr.find(':', key_pos)) != std::string::npos) {
-            if ((val_pos = keyValuePairsStr.find_first_not_of(": ", key_end)) == std::string::npos) {
-                // Handle the case of empty string
-                outMap.emplace(trim_copy(keyValuePairsStr.substr(key_pos, key_end - key_pos)), std::string());
+            if ((val_pos = keyValuePairsStr.find_first_not_of(": ", key_end)) == std::string::npos)
                 break;
-            }
 
             val_end = keyValuePairsStr.find(',', val_pos);
             outMap.emplace(trim_copy(keyValuePairsStr.substr(key_pos, key_end - key_pos)),
@@ -185,17 +181,11 @@ namespace PeterDBTesting {
 
     static void setBit(char &src, bool value, unsigned offset) {
         if (value) {
-            src |= 1u << offset;
+            src |= (unsigned) 1 << offset;
         } else {
-            src &= ~(1u << offset);
+            src &= ~((unsigned) 1 << offset);
         }
     }
-
-
-
-
-
-
 
     static void setAttrNull(void *src, ushort attrNum, bool isNull) {
         unsigned bytes = 0;
@@ -204,8 +194,8 @@ namespace PeterDBTesting {
         setBit(*((char *) src + bytes), isNull, pos);
     }
 
-//    // This code is required for testing to measure the memory usage of your code.
-//    // If you can't compile the codebase because of this function, you can safely comment this function or remove it.
+    // This code is required for testing to measure the memory usage of your code.
+    // If you can't compile the codebase because of this function, you can safely comment this function or remove it.
 //    void memProfile() {
 //        int who = RUSAGE_SELF;
 //        struct rusage usage{};

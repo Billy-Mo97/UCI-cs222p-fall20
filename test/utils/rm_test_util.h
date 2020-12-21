@@ -42,7 +42,7 @@ namespace PeterDBTesting {
 
                 // Create Catalog
                 ASSERT_EQ(rm.createCatalog(), success) << "Creating the Catalog should succeed.";
-                //printf("create catalog succeed\n");
+
                 // Create a table
                 std::vector<PeterDB::Attribute> table_attrs = parseDDL(
                         "CREATE TABLE " + tableName + " (emp_name VARCHAR(50), age INT, height REAL, salary REAL)");
